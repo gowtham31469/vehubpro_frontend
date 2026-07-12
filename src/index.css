@@ -1,0 +1,34 @@
+@import 'tailwindcss';
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  --tenant-primary: #1e378a;
+  --tenant-primary-soft: rgba(30, 55, 138, 0.12);
+}
+
+html, body, #root {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  min-height: 100%;
+}
+
+body {
+  font-family: 'Inter', sans-serif;
+}
+
+@media print {
+  body * { visibility: hidden; }
+  #invoice-print, #invoice-print * { visibility: visible; }
+  #invoice-print {
+    position: fixed;
+    inset: 0;
+    margin: 0;
+    padding: 32px;
+    max-width: 100%;
+    box-shadow: none;
+    border: none;
+    border-radius: 0;
+  }
+}
