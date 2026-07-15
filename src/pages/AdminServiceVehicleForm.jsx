@@ -304,7 +304,7 @@ export default function AdminServiceVehicleForm() {
               ) : null}
 
               {/* Section: Vehicle Information */}
-              <div className="rounded-xl border border-slate-200 bg-white p-3 backdrop-blur-sm dark:border-slate-800/60 dark:bg-slate-900/40 md:p-4">
+              <div className="relative z-10 rounded-xl border border-slate-200 bg-white p-3 backdrop-blur-sm dark:border-slate-800/60 dark:bg-slate-900/40 md:p-4">
                 <p className="mb-3 text-sm font-bold uppercase tracking-wide text-slate-700 dark:text-slate-300">Vehicle Information</p>
                 <div className="grid grid-cols-1 gap-2.5 md:grid-cols-2">
 
