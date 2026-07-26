@@ -312,6 +312,11 @@ export default function AdminShell({ children }) {
   }
 
   useEffect(() => {
+    // AdminShell remounts on every sidebar navigation (each admin page renders
+    // its own <AdminShell>), so skip the refetch once this tab already has a
+    // cached copy — nav modules don't change mid-session.
+    if (getCachedNav()) return
+
     let cancelled = false
     fetchUserNavModules()
       .then((modules) => {

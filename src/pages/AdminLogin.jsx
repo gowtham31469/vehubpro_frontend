@@ -1,7 +1,7 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { saveBranding } from '../utils/branding'
-import { setCurrentUser } from '../utils/apiClient'
+import { isAuthenticated, setCurrentUser } from '../utils/apiClient'
 import { useTenantBranding } from '../context/TenantBrandingContext.jsx'
 import loginSideImage from '../assets/images/logan-meis-7qLT-Msda1k-unsplash.jpg'
 
@@ -57,6 +57,13 @@ export default function AdminLogin() {
   const [isLoading, setIsLoading] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
   const [fieldErrors, setFieldErrors] = useState({})
+
+  // Already signed in (e.g. navigated back to /admin manually) — skip the login form.
+  useEffect(() => {
+    if (isAuthenticated()) {
+      navigate('/admin/dashboard', { replace: true })
+    }
+  }, [navigate])
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -116,6 +123,11 @@ export default function AdminLogin() {
     } finally {
       setIsLoading(false)
     }
+  }
+
+  // Redirecting an already-authenticated user — render nothing while it happens.
+  if (isAuthenticated()) {
+    return null
   }
 
   // Show elegant error page if tenant not found

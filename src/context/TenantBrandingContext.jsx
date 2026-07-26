@@ -65,26 +65,24 @@ export function TenantBrandingProvider({ children }) {
     return () => { cancelled = true }
   }, [subdomain])
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (signal) => {
     const token = localStorage.getItem('access_token')
     if (!token) return
-    const data = await fetchBrandingByToken()
+    const data = await fetchBrandingByToken(signal)
     setBranding(data)
     return data
   }, [])
 
   useEffect(() => {
-    let cancelled = false
+    const controller = new AbortController()
     void (async () => {
       try {
-        await refresh()
-      } catch {
-        if (!cancelled) setBranding(getStoredBranding())
+        await refresh(controller.signal)
+      } catch (error) {
+        if (error.name !== 'AbortError') setBranding(getStoredBranding())
       }
     })()
-    return () => {
-      cancelled = true
-    }
+    return () => controller.abort()
   }, [refresh])
 
   useEffect(() => {

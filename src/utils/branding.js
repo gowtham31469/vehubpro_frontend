@@ -41,8 +41,8 @@ export function saveBranding(branding) {
   return normalized
 }
 
-export async function fetchBrandingByToken() {
-  const { response, payload } = await apiFetch('/api/v1/tenants/branding/me/', { method: 'GET' })
+export async function fetchBrandingByToken(signal) {
+  const { response, payload } = await apiFetch('/api/v1/tenants/branding/me/', { method: 'GET', signal })
   if (!response.ok) {
     throw new Error('Could not fetch tenant branding.')
   }
