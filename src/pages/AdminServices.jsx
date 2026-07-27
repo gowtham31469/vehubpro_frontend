@@ -800,50 +800,54 @@ export default function AdminServices() {
                 </div>
               </div>
 
-              <div>
-                <label className="mb-1 block text-xs font-semibold text-slate-500 dark:text-slate-400">HSN Code</label>
-                <input
-                  value={itemForm.hsn_code}
-                  onChange={(e) => setItemForm((p) => ({ ...p, hsn_code: e.target.value }))}
-                  className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 px-3 py-2.5 text-sm outline-none focus:border-slate-400 dark:focus:border-slate-600 placeholder:text-slate-400 dark:placeholder:text-slate-600"
-                  placeholder="998714"
-                  maxLength={8}
-                />
-              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="mb-1 block text-xs font-semibold text-slate-500 dark:text-slate-400">HSN Code</label>
+                  <input
+                    value={itemForm.hsn_code}
+                    onChange={(e) => setItemForm((p) => ({ ...p, hsn_code: e.target.value }))}
+                    className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 px-3 py-2.5 text-sm outline-none focus:border-slate-400 dark:focus:border-slate-600 placeholder:text-slate-400 dark:placeholder:text-slate-600"
+                    placeholder="998714"
+                    maxLength={8}
+                  />
+                </div>
 
-              {/* Vehicle type */}
-              <div>
-                <label className="mb-1 block text-xs font-semibold text-slate-500 dark:text-slate-400">Vehicle Type</label>
-                <div className="relative" ref={vtItemDropdownRef}>
-                  <button
-                    type="button"
-                    onClick={() => { setIsCatModalDropdownOpen(false); setIsVtItemDropdownOpen((prev) => !prev) }}
-                    className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 px-3 py-2.5 pr-9 text-left text-sm font-medium text-slate-700 dark:text-slate-200 outline-none transition hover:border-slate-300 dark:hover:border-slate-600"
-                  >
-                    {(itemForm.applicable_vehicle_types || []).length > 0
-                      ? itemForm.applicable_vehicle_types.map((code) => vehicleTypes.find((v) => v.code === code)?.name || code).join(', ')
-                      : 'Select vehicle type'}
-                  </button>
-                  <ChevronDown size={16} className={`pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 transition ${isVtItemDropdownOpen ? 'rotate-180' : ''}`} />
-                  {isVtItemDropdownOpen ? (
-                    <div className="absolute left-0 right-0 z-[60] mt-2 max-h-56 overflow-auto rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-lg">
-                      {vehicleTypes.map((vt) => {
-                        const sel = (itemForm.applicable_vehicle_types || []).includes(vt.code)
-                        return (
-                          <button
-                            key={vt.id}
-                            type="button"
-                            onClick={() => toggleVtItem(vt.code)}
-                            className={`flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm transition ${sel ? 'font-semibold' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
-                            style={sel ? { backgroundColor: theme.accentSoft, color: theme.accent } : undefined}
-                          >
-                            {sel ? <Check size={14} /> : <span className="w-[14px]" />}
-                            <span className="min-w-0 flex-1 truncate">{vt.name}</span>
-                          </button>
-                        )
-                      })}
-                    </div>
-                  ) : null}
+                {/* Vehicle type */}
+                <div>
+                  <label className="mb-1 block text-xs font-semibold text-slate-500 dark:text-slate-400">Vehicle Type</label>
+                  <div className="relative" ref={vtItemDropdownRef}>
+                    <button
+                      type="button"
+                      onClick={() => { setIsCatModalDropdownOpen(false); setIsVtItemDropdownOpen((prev) => !prev) }}
+                      className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 px-3 py-2.5 pr-9 text-left text-sm font-medium text-slate-700 dark:text-slate-200 outline-none transition hover:border-slate-300 dark:hover:border-slate-600"
+                    >
+                      <span className="block truncate">
+                        {(itemForm.applicable_vehicle_types || []).length > 0
+                          ? itemForm.applicable_vehicle_types.map((code) => vehicleTypes.find((v) => v.code === code)?.name || code).join(', ')
+                          : 'Select vehicle type'}
+                      </span>
+                    </button>
+                    <ChevronDown size={16} className={`pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 transition ${isVtItemDropdownOpen ? 'rotate-180' : ''}`} />
+                    {isVtItemDropdownOpen ? (
+                      <div className="absolute left-0 right-0 z-[60] mt-2 max-h-56 overflow-auto rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-lg">
+                        {vehicleTypes.map((vt) => {
+                          const sel = (itemForm.applicable_vehicle_types || []).includes(vt.code)
+                          return (
+                            <button
+                              key={vt.id}
+                              type="button"
+                              onClick={() => toggleVtItem(vt.code)}
+                              className={`flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm transition ${sel ? 'font-semibold' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
+                              style={sel ? { backgroundColor: theme.accentSoft, color: theme.accent } : undefined}
+                            >
+                              {sel ? <Check size={14} /> : <span className="w-[14px]" />}
+                              <span className="min-w-0 flex-1 truncate">{vt.name}</span>
+                            </button>
+                          )
+                        })}
+                      </div>
+                    ) : null}
+                  </div>
                 </div>
               </div>
 
