@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState } from 'react'
-import { Check, ChevronDown, UserPlus, X } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { UserPlus, X } from 'lucide-react'
 import { useTenantBranding } from '../context/TenantBrandingContext.jsx'
 import { createCustomer, fetchCities, fetchStates } from '../utils/customers'
+import SearchableSelect from './SearchableSelect'
 
 const emptyForm = {
   full_name: '',
@@ -53,32 +54,11 @@ export default function AddCustomerDrawer({ open, onClose, onCustomerCreated }) 
   const [cities, setCities] = useState([])
   const [locationsLoading, setLocationsLoading] = useState(false)
 
-  const [stateOpen, setStateOpen] = useState(false)
-  const [cityOpen, setCityOpen] = useState(false)
-
-  const stateRef = useRef(null)
-  const cityRef = useRef(null)
-
-  const selectedState = states.find((s) => String(s.id) === String(form.state))
-  const selectedCity = cities.find((c) => String(c.id) === String(form.city))
-
-  useEffect(() => {
-    if (!stateOpen && !cityOpen) return undefined
-    const handle = (e) => {
-      if (stateRef.current && !stateRef.current.contains(e.target)) setStateOpen(false)
-      if (cityRef.current && !cityRef.current.contains(e.target)) setCityOpen(false)
-    }
-    document.addEventListener('mousedown', handle)
-    return () => document.removeEventListener('mousedown', handle)
-  }, [stateOpen, cityOpen])
-
   // Load states when drawer opens
   useEffect(() => {
     if (!open) return
     setForm(emptyForm)
     setFormError('')
-    setStateOpen(false)
-    setCityOpen(false)
     setLocationsLoading(true)
     fetchStates()
       .then((data) => setStates(Array.isArray(data) ? data : []))
@@ -307,88 +287,31 @@ export default function AddCustomerDrawer({ open, onClose, onCustomerCreated }) 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className={labelCls}>State</label>
-                    <div className="relative" ref={stateRef}>
-                      <button
-                        type="button"
-                        disabled={locationsLoading}
-                        onClick={() => { if (locationsLoading) return; setStateOpen((p) => !p) }}
-                        className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 pr-9 text-left text-sm font-medium text-slate-700 outline-none transition hover:border-slate-300 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-800 dark:bg-slate-950/50 dark:text-slate-200"
-                      >
-                        {locationsLoading ? 'Loading…' : selectedState?.name || 'Select state'}
-                      </button>
-                      <ChevronDown size={15} className={`pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 transition ${stateOpen ? 'rotate-180' : ''}`} />
-                      {stateOpen ? (
-                        <div className="absolute left-0 right-0 z-20 mt-1.5 max-h-48 overflow-auto rounded-xl border border-slate-200 bg-white shadow-lg dark:border-slate-700 dark:bg-slate-800">
-                          <button
-                            type="button"
-                            onClick={() => { setForm((p) => ({ ...p, state: '', city: '' })); setStateOpen(false) }}
-                            className={`flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm transition ${!form.state ? 'font-semibold' : 'text-slate-600 hover:bg-slate-50 dark:text-slate-400 dark:hover:bg-slate-700'}`}
-                            style={!form.state ? { backgroundColor: theme.accentSoft, color: theme.accent } : undefined}
-                          >
-                            {!form.state ? <Check size={13} /> : <span className="w-[13px]" />}
-                            Select state
-                          </button>
-                          {states.map((s) => {
-                            const sel = String(form.state) === String(s.id)
-                            return (
-                              <button
-                                key={s.id}
-                                type="button"
-                                onClick={() => { setForm((p) => ({ ...p, state: String(s.id), city: '' })); setStateOpen(false) }}
-                                className={`flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm transition ${sel ? 'font-semibold' : 'text-slate-600 hover:bg-slate-50 dark:text-slate-400 dark:hover:bg-slate-700'}`}
-                                style={sel ? { backgroundColor: theme.accentSoft, color: theme.accent } : undefined}
-                              >
-                                {sel ? <Check size={13} /> : <span className="w-[13px]" />}
-                                {s.name}
-                              </button>
-                            )
-                          })}
-                        </div>
-                      ) : null}
-                    </div>
+                    <SearchableSelect
+                      value={form.state}
+                      options={states}
+                      onChange={(id) => setForm((p) => ({ ...p, state: id, city: '' }))}
+                      placeholder="Select state"
+                      searchPlaceholder="Search states…"
+                      loading={locationsLoading}
+                      accent={theme.accent}
+                      accentSoft={theme.accentSoft}
+                    />
                   </div>
 
                   <div>
                     <label className={labelCls}>City</label>
-                    <div className="relative" ref={cityRef}>
-                      <button
-                        type="button"
-                        disabled={!form.state || locationsLoading}
-                        onClick={() => { if (!form.state || locationsLoading) return; setStateOpen(false); setCityOpen((p) => !p) }}
-                        className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 pr-9 text-left text-sm font-medium text-slate-700 outline-none transition hover:border-slate-300 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-800 dark:bg-slate-950/50 dark:text-slate-200"
-                      >
-                        {!form.state ? 'Select state first' : locationsLoading ? 'Loading…' : selectedCity?.name || 'Select city'}
-                      </button>
-                      <ChevronDown size={15} className={`pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 transition ${cityOpen ? 'rotate-180' : ''}`} />
-                      {cityOpen ? (
-                        <div className="absolute left-0 right-0 z-20 mt-1.5 max-h-48 overflow-auto rounded-xl border border-slate-200 bg-white shadow-lg dark:border-slate-700 dark:bg-slate-800">
-                          <button
-                            type="button"
-                            onClick={() => { setForm((p) => ({ ...p, city: '' })); setCityOpen(false) }}
-                            className={`flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm transition ${!form.city ? 'font-semibold' : 'text-slate-600 hover:bg-slate-50 dark:text-slate-400 dark:hover:bg-slate-700'}`}
-                            style={!form.city ? { backgroundColor: theme.accentSoft, color: theme.accent } : undefined}
-                          >
-                            {!form.city ? <Check size={13} /> : <span className="w-[13px]" />}
-                            Select city
-                          </button>
-                          {cities.map((c) => {
-                            const sel = String(form.city) === String(c.id)
-                            return (
-                              <button
-                                key={c.id}
-                                type="button"
-                                onClick={() => { setForm((p) => ({ ...p, city: String(c.id) })); setCityOpen(false) }}
-                                className={`flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm transition ${sel ? 'font-semibold' : 'text-slate-600 hover:bg-slate-50 dark:text-slate-400 dark:hover:bg-slate-700'}`}
-                                style={sel ? { backgroundColor: theme.accentSoft, color: theme.accent } : undefined}
-                              >
-                                {sel ? <Check size={13} /> : <span className="w-[13px]" />}
-                                {c.name}
-                              </button>
-                            )
-                          })}
-                        </div>
-                      ) : null}
-                    </div>
+                    <SearchableSelect
+                      value={form.city}
+                      options={cities}
+                      onChange={(id) => setForm((p) => ({ ...p, city: id }))}
+                      placeholder={!form.state ? 'Select state first' : 'Select city'}
+                      searchPlaceholder="Search cities…"
+                      disabled={!form.state}
+                      loading={locationsLoading}
+                      accent={theme.accent}
+                      accentSoft={theme.accentSoft}
+                    />
                   </div>
                 </div>
 
