@@ -2,6 +2,10 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
+@theme {
+  --font-display: 'Inter', sans-serif;
+}
+
 :root {
   --tenant-primary: #1e378a;
   --tenant-primary-soft: rgba(30, 55, 138, 0.12);
