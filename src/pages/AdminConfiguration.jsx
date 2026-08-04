@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Check, ChevronDown, Pencil, Plus, Search, Trash2, X } from 'lucide-react'
 import AdminShell from '../components/AdminShell'
+import InvoiceSettingsPanel from '../components/InvoiceSettingsPanel.jsx'
 import { useToast } from '../context/ToastContext.jsx'
 import { useTenantBranding } from '../context/TenantBrandingContext.jsx'
 import {
@@ -339,13 +340,14 @@ export default function AdminConfiguration() {
         <div className="mx-auto max-w-[1180px] space-y-5">
           <div>
             <h2 className="text-3xl font-bold text-slate-900 dark:text-white">Configuration</h2>
-            <p className="mt-1 text-slate-500 dark:text-slate-400">Manage vehicle brands and models for your workshop.</p>
+            <p className="mt-1 text-slate-500 dark:text-slate-400">Manage vehicle brands, models, and invoice settings for your workshop.</p>
           </div>
 
           <div className="flex flex-wrap gap-2 rounded-2xl border border-slate-200 bg-white p-2 shadow-sm backdrop-blur-sm dark:border-slate-800/60 dark:bg-slate-900/40">
             {[
               ['brands', 'Brands'],
               ['models', 'Models'],
+              ['invoice', 'Invoice Settings'],
             ].map(([id, label]) => (
               <button
                 key={id}
@@ -446,7 +448,7 @@ export default function AdminConfiguration() {
                 </div>
               </div>
             </div>
-          ) : (
+          ) : tab === 'models' ? (
             <div className="space-y-4">
               <div className="flex flex-wrap items-end gap-3">
                 <div className="relative min-w-[200px] flex-1 max-w-xs">
@@ -591,6 +593,8 @@ export default function AdminConfiguration() {
                 </div>
               </div>
             </div>
+          ) : (
+            <InvoiceSettingsPanel />
           )}
         </div>
       </AdminShell>

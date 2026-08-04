@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import ReactDOM from 'react-dom'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import {
@@ -9,7 +9,6 @@ import {
   FileText,
   Lock,
   Loader2,
-  Mail,
   Pencil,
   Phone,
   Plus,
@@ -80,11 +79,12 @@ function toDatetimeLocalValue(iso) {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
 
-function newLineRow() {
+function newLineRow(serviceType = 'labour') {
   const key = globalThis.crypto?.randomUUID?.() ?? `n-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
   return {
     key,
     service_item: '',
+    service_type: serviceType,
     description: '',
     detail_text: '',
     quantity: '1',
@@ -114,6 +114,7 @@ function mapApiToForm(full) {
       ? full.line_items.map((li) => ({
           key: li.id,
           service_item: parseServiceItemPk(li.service_item) ?? '',
+          service_type: li.service_type === 'part' ? 'part' : 'labour',
           description: li.description ?? '',
           detail_text: li.detail_text ?? '',
           quantity: String(li.quantity ?? 1),
@@ -387,16 +388,16 @@ export default function AdminJobCardEditor() {
   const [recentIds, setRecentIds] = useState(() => readRecentIds())
   const [vinRevealed, setVinRevealed] = useState(false)
   const [statusOpen, setStatusOpen] = useState(false)
-  const [custOpen, setCustOpen] = useState(false)
   const [vehOpen, setVehOpen] = useState(false)
+  const [vehSearch, setVehSearch] = useState('')
   const [couponOpen, setCouponOpen] = useState(false)
   const [recommendationModalOpen, setRecommendationModalOpen] = useState(false)
   const [recommendationText, setRecommendationText] = useState('')
   const [pendingStatus, setPendingStatus] = useState(null)
   const [dropdownPos, setDropdownPos] = useState({ top: 0, left: 0, width: 0 })
   const statusRef = useRef(null)
-  const custRef = useRef(null)
   const vehRef = useRef(null)
+  const vehSearchInputRef = useRef(null)
   const serviceComboRef = useRef(null)
   const serviceInputRef = useRef(null)
   const serviceDropdownRef = useRef(null)
@@ -404,18 +405,125 @@ export default function AdminJobCardEditor() {
   const preview = useMemo(() => computePreview(form, serviceItems), [form, serviceItems])
   const isLocked = form.status === 'invoiced'
 
-  const loadVehiclesForCustomer = useCallback(async (customerId) => {
-    if (!customerId) {
-      setVehicles([])
-      return
-    }
-    try {
-      const d = await fetchServiceVehicles({ page: 1, pageSize: 100, customerId })
-      setVehicles(d.results || [])
-    } catch {
-      setVehicles([])
-    }
-  }, [])
+  const rowAmount = (row) => {
+    const net = Math.max(
+      0,
+      Math.round(((Number(row.quantity) || 0) * (Number(row.unit_price) || 0) - (Number(row.discount_amount) || 0)) * 100) / 100,
+    )
+    const tax = preview.taxByKey.get(row.key) ?? 0
+    return net + tax
+  }
+  const partRows = form.line_items.filter((r) => r.service_type === 'part')
+  const labourRows = form.line_items.filter((r) => r.service_type !== 'part')
+  const partsTotal = partRows.reduce((sum, r) => sum + rowAmount(r), 0)
+  const labourTotal = labourRows.reduce((sum, r) => sum + rowAmount(r), 0)
+
+  const renderLineRow = (row) => {
+    const hasCatalog = resolveServiceItemPk(row, serviceItems) != null
+    const hasDesc = Boolean((row.description || '').trim())
+    const isDraft = !hasDesc && !hasCatalog
+    const lineNet = Math.max(
+      0,
+      Math.round(((Number(row.quantity) || 0) * (Number(row.unit_price) || 0) - (Number(row.discount_amount) || 0)) * 100) / 100,
+    )
+    const tax = preview.taxByKey.get(row.key) ?? 0
+    return (
+      <tr
+        key={row.key}
+        className={`align-top transition-colors ${isDraft ? 'bg-amber-50/35 dark:bg-amber-900/10' : 'hover:bg-slate-50/50 dark:hover:bg-slate-800/30'}`}
+      >
+        <td className="px-5 py-4">
+          <input
+            value={row.description}
+            readOnly={isLocked}
+            onChange={(e) =>
+              !isLocked && setForm((p) => ({
+                ...p,
+                line_items: p.line_items.map((r) => (r.key === row.key ? { ...r, description: e.target.value } : r)),
+              }))
+            }
+            className={`w-full min-w-[160px] border-0 bg-transparent p-0 font-bold text-slate-900 outline-none focus:ring-0 dark:text-slate-100 ${isLocked ? 'cursor-default' : ''}`}
+            placeholder="Service name"
+            autoComplete="off"
+          />
+          <input
+            value={row.detail_text}
+            readOnly={isLocked}
+            onChange={(e) =>
+              !isLocked && setForm((p) => ({
+                ...p,
+                line_items: p.line_items.map((r) => (r.key === row.key ? { ...r, detail_text: e.target.value } : r)),
+              }))
+            }
+            className={`mt-1 w-full min-w-[160px] border-0 bg-transparent p-0 text-xs text-slate-500 outline-none focus:ring-0 dark:text-slate-400 ${isLocked ? 'cursor-default' : ''}`}
+            placeholder="Detail / spec (optional)"
+            autoComplete="off"
+          />
+          {(() => {
+            const pk = parseServiceItemPk(row.service_item) ?? resolveServiceItemPk(row, serviceItems)
+            const item = pk ? serviceItems.find((s) => String(s.id) === pk) : null
+            const categoryName = item?.category_name || null
+            return categoryName ? (
+              <p className="mt-1 text-xs text-slate-500 dark:text-slate-500">{categoryName}</p>
+            ) : null
+          })()}
+        </td>
+        <td className="px-5 py-4 text-right tabular-nums">
+          <input
+            type="number"
+            step="0.001"
+            min="0"
+            value={row.quantity}
+            readOnly={isLocked}
+            onChange={(e) =>
+              !isLocked && setForm((p) => ({
+                ...p,
+                line_items: p.line_items.map((r) => (r.key === row.key ? { ...r, quantity: e.target.value } : r)),
+              }))
+            }
+            className="w-20 rounded-lg border border-slate-200 bg-white px-2 py-1 text-right tabular-nums focus:border-slate-300 outline-none dark:border-slate-800 dark:bg-slate-900 dark:text-white dark:focus:border-slate-700 disabled:opacity-50"
+            disabled={isLocked}
+          />
+        </td>
+        <td className="px-5 py-4 text-right tabular-nums">
+          <input
+            type="number"
+            step="0.01"
+            min="0"
+            value={row.unit_price}
+            readOnly={isLocked}
+            onChange={(e) =>
+              !isLocked && setForm((p) => ({
+                ...p,
+                line_items: p.line_items.map((r) => (r.key === row.key ? { ...r, unit_price: e.target.value } : r)),
+              }))
+            }
+            className="w-28 rounded-lg border border-slate-200 bg-white px-2 py-1 text-right tabular-nums focus:border-slate-300 outline-none dark:border-slate-800 dark:bg-slate-900 dark:text-white dark:focus:border-slate-700 disabled:opacity-50"
+            disabled={isLocked}
+          />
+        </td>
+        <td className="px-5 py-4 text-right tabular-nums text-slate-600 dark:text-slate-400">{fmtMoney(tax)}</td>
+        <td className="px-5 py-4 text-right font-semibold tabular-nums text-slate-900 dark:text-white">{fmtMoney(lineNet + tax)}</td>
+        <td className="px-5 py-4">
+          {!isLocked && (
+            <button
+              type="button"
+              aria-label="Remove line"
+              onClick={() =>
+                setForm((p) => ({
+                  ...p,
+                  line_items: p.line_items.filter((r) => r.key !== row.key),
+                }))
+              }
+              className="rounded-lg p-2 text-rose-600 hover:bg-rose-50"
+            >
+              <Trash2 size={16} />
+            </button>
+          )}
+        </td>
+      </tr>
+    )
+  }
 
   useEffect(() => {
     fetchCustomers({ page: 1, pageSize: 200 })
@@ -423,16 +531,19 @@ export default function AdminJobCardEditor() {
       .catch(() => setCustomers([]))
   }, [])
 
+  // Vehicles are loaded once, tenant-wide, so a vehicle can be searched and
+  // picked first — selecting one then auto-selects its owning customer.
+  useEffect(() => {
+    fetchServiceVehicles({ page: 1, pageSize: 100 })
+      .then((d) => setVehicles(d.results || []))
+      .catch(() => setVehicles([]))
+  }, [])
+
   useEffect(() => {
     fetchServiceItems({ page: 1, pageSize: 500, isActive: true })
       .then((d) => setServiceItems(d.results || []))
       .catch(() => setServiceItems([]))
   }, [])
-
-  useEffect(() => {
-    if (form.customer) void loadVehiclesForCustomer(form.customer)
-    else setVehicles([])
-  }, [form.customer, loadVehiclesForCustomer])
 
   useEffect(() => {
     if (isNew) {
@@ -453,7 +564,6 @@ export default function AdminJobCardEditor() {
         setForm(mapped)
         setHeader({ jobcard_number: full.jobcard_number, updated_at: full.updated_at })
         if (Number(mapped.discount_amount) > 0) setCouponOpen(true)
-        void loadVehiclesForCustomer(String(full.customer))
       } catch (e) {
         if (e.message === 'SESSION_EXPIRED') {
           globalThis.location.href = '/admin'
@@ -467,13 +577,19 @@ export default function AdminJobCardEditor() {
     return () => {
       cancelled = true
     }
-  }, [isNew, routeId, loadVehiclesForCustomer])
+  }, [isNew, routeId])
 
   useEffect(() => {
-    if (!statusOpen && !custOpen && !vehOpen && !serviceComboOpen) return undefined
+    if (!vehOpen) return
+    setVehSearch('')
+    const raf = requestAnimationFrame(() => vehSearchInputRef.current?.focus())
+    return () => cancelAnimationFrame(raf)
+  }, [vehOpen])
+
+  useEffect(() => {
+    if (!statusOpen && !vehOpen && !serviceComboOpen) return undefined
     const down = (e) => {
       if (statusRef.current && !statusRef.current.contains(e.target)) setStatusOpen(false)
-      if (custRef.current && !custRef.current.contains(e.target)) setCustOpen(false)
       if (vehRef.current && !vehRef.current.contains(e.target)) setVehOpen(false)
       if (
         serviceComboRef.current && !serviceComboRef.current.contains(e.target) &&
@@ -482,7 +598,7 @@ export default function AdminJobCardEditor() {
     }
     document.addEventListener('mousedown', down)
     return () => document.removeEventListener('mousedown', down)
-  }, [statusOpen, custOpen, vehOpen, serviceComboOpen])
+  }, [statusOpen, vehOpen, serviceComboOpen])
 
   // Calculate dropdown position for portal rendering and update on scroll/resize
   useEffect(() => {
@@ -528,6 +644,15 @@ export default function AdminJobCardEditor() {
     () => vehicles.find((v) => String(v.id) === String(form.vehicle)),
     [vehicles, form.vehicle],
   )
+  const filteredVehicles = useMemo(() => {
+    const q = vehSearch.trim().toLowerCase()
+    if (!q) return vehicles
+    return vehicles.filter((v) =>
+      [v.registration_no, v.brand_name, v.vehicle_model_name, v.customer_name]
+        .filter(Boolean)
+        .some((field) => String(field).toLowerCase().includes(q)),
+    )
+  }, [vehicles, vehSearch])
   const filteredServices = useMemo(() => {
     const q = serviceSearch.trim().toLowerCase()
     if (!q)
@@ -568,7 +693,7 @@ export default function AdminJobCardEditor() {
     
     if (itemPk) pushRecentId(itemPk)
     setRecentIds(readRecentIds())
-    const row = newLineRow()
+    const row = newLineRow(svc.service_type === 'part' ? 'part' : 'labour')
     row.service_item = parseServiceItemPk(svc?.id) ?? ''
     row.description = svc.name || ''
     row.detail_text = (svc.description || '').trim().slice(0, 500)
@@ -621,6 +746,7 @@ export default function AdminJobCardEditor() {
       .map((row, idx) => ({
         sort_order: idx,
         service_item: resolveServiceItemPk(row, serviceItems),
+        service_type: row.service_type === 'part' ? 'part' : 'labour',
         description: (row.description || '').trim(),
         detail_text: (row.detail_text || '').trim(),
         quantity: String(row.quantity || '1'),
@@ -665,7 +791,6 @@ export default function AdminJobCardEditor() {
 
   const jobDisplay = header.jobcard_number || 'New job card'
   const displayVin = selectedVehicle?.vin_number || null
-  const displayEmail = selectedCustomer?.email || '—'
   const displayPhone = selectedCustomer?.phone || '—'
 
   if (loading) {
@@ -926,179 +1051,129 @@ export default function AdminJobCardEditor() {
             </div>
           )}
 
-          {/* Customer & vehicle — side by side from md, stacked on small screens */}
-          <div className="mb-6 grid grid-cols-1 gap-5 md:grid-cols-2">
+          {/* Vehicle — full width; customer shown compactly inline (auto-filled from vehicle) */}
+          <div className="mb-6">
                 <section
-                  className="rounded-xl border border-slate-200 bg-white p-6 shadow-[0_1px_3px_rgba(15,23,42,0.06)] backdrop-blur-sm dark:border-slate-800 dark:bg-slate-900/40"
-                  aria-labelledby="cust-heading"
-                >
-                  <h2 id="cust-heading" className="mb-4 text-[11px] font-bold uppercase tracking-[0.16em] text-slate-400 dark:text-slate-500">
-                    Customer details
-                  </h2>
-                  <div className="flex gap-4">
-                    <div
-                      className="flex h-[72px] w-[72px] shrink-0 items-center justify-center rounded-xl bg-slate-100 overflow-hidden text-xl font-bold text-white shadow-sm"
-                      style={!selectedCustomer?.photo_url ? { backgroundColor: theme.accent } : {}}
-                      aria-hidden
-                    >
-                      {selectedCustomer?.photo_url ? (
-                        <img src={selectedCustomer.photo_url} alt="" className="h-full w-full object-cover" />
-                      ) : (
-                        (selectedCustomer?.full_name || '?').slice(0, 1).toUpperCase()
-                      )}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="relative" ref={custRef}>
-                          <button
-                            type="button"
-                            onClick={() => !isLocked && setCustOpen((o) => !o)}
-                            disabled={isLocked}
-                            className="flex w-full items-start justify-between gap-2 rounded-lg text-left transition hover:bg-slate-50/80 disabled:cursor-default"
-                          >
-                            <span className="text-lg font-bold leading-snug text-slate-900 dark:text-white">
-                              {selectedCustomer?.full_name || 'Select customer'}
-                            </span>
-                            {!isLocked && (
-                              <ChevronDown
-                                size={20}
-                                className={`mt-0.5 shrink-0 text-slate-400 transition ${custOpen ? 'rotate-180' : ''}`}
-                                aria-hidden
-                              />
-                            )}
-                          </button>
-                        {custOpen ? (
-                          <div className="absolute left-0 right-0 z-50 mt-2 max-h-52 overflow-auto rounded-xl border border-slate-200 bg-white py-1 shadow-lg backdrop-blur-md dark:border-slate-800 dark:bg-slate-900/90">
-                            {customers.map((c) => (
-                              <button
-                                key={c.id}
-                                type="button"
-                                onClick={() => {
-                                  setForm((p) => ({ ...p, customer: String(c.id), vehicle: '' }))
-                                  setCustOpen(false)
-                                }}
-                                className="flex w-full items-center gap-2.5 px-3 py-2.5 text-left text-sm hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800"
-                              >
-                                {c.photo_url ? (
-                                  <img src={c.photo_url} alt="" className="h-6 w-6 shrink-0 rounded-full object-cover shadow-sm" />
-                                ) : (
-                                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-100 text-[10px] font-bold text-slate-500 shadow-sm">
-                                    {(c.full_name || '?').slice(0, 1).toUpperCase()}
-                                  </span>
-                                )}
-                                <span className="truncate">{c.full_name}</span>
-                              </button>
-                            ))}
-                          </div>
-                        ) : null}
-                      </div>
-                      <div className="mt-5 space-y-2.5 border-t border-slate-100 pt-4 dark:border-slate-800">
-                        <p className="flex items-center gap-2.5 text-sm text-slate-700 dark:text-slate-300">
-                          <Phone size={17} className="shrink-0 text-slate-400 dark:text-slate-500" strokeWidth={2} aria-hidden />
-                          <span className="min-w-0">{displayPhone}</span>
-                        </p>
-                        <p className="flex items-center gap-2.5 text-sm text-slate-700 dark:text-slate-300">
-                          <Mail size={17} className="shrink-0 text-slate-400 dark:text-slate-500" strokeWidth={2} aria-hidden />
-                          <span className="min-w-0 break-all">{displayEmail}</span>
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </section>
-
-                <section
-                  className="rounded-xl border border-slate-200 bg-white p-6 shadow-[0_1px_3px_rgba(15,23,42,0.06)] backdrop-blur-sm dark:border-slate-800 dark:bg-slate-900/40"
+                  className="rounded-xl border border-slate-200 bg-white p-4 shadow-[0_1px_3px_rgba(15,23,42,0.06)] backdrop-blur-sm dark:border-slate-800 dark:bg-slate-900/40"
                   aria-labelledby="veh-heading"
                 >
-                  <h2 id="veh-heading" className="mb-4 text-[11px] font-bold uppercase tracking-[0.16em] text-slate-400 dark:text-slate-500">
-                    Vehicle information
-                  </h2>
-                  <div className="flex gap-4">
+                  <div className="flex gap-3">
                     <div
-                      className="flex h-[72px] w-[72px] shrink-0 items-center justify-center rounded-xl bg-slate-800 text-white shadow-sm overflow-hidden"
+                      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-slate-800 text-white shadow-sm overflow-hidden"
                       aria-hidden
                     >
                       {selectedVehicle?.photo_url ? (
                         <img src={selectedVehicle.photo_url} alt="" className="h-full w-full object-cover" />
                       ) : (
-                        <svg className="h-9 w-9" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.15}>
+                        <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.15}>
                           <path d="M4 13h2l1.2-3.6h11.6L19 13h1M5.5 13v3.5h13V13M8 16.5h.01M16 16.5h.01" strokeLinecap="round" strokeLinejoin="round" />
                           <path d="M6 10.5L7 8h10l1 2.5" strokeLinecap="round" strokeLinejoin="round" />
                         </svg>
                       )}
                     </div>
                     <div className="min-w-0 flex-1">
+                      <h2 id="veh-heading" className="sr-only">Vehicle information</h2>
                       <div className="relative" ref={vehRef}>
                         <button
                           type="button"
-                          disabled={!form.customer || isLocked}
+                          disabled={isLocked}
                           onClick={() => setVehOpen((o) => !o)}
                           className="flex w-full items-start justify-between gap-2 rounded-lg text-left transition enabled:hover:bg-slate-50/80 disabled:opacity-50"
                         >
-                          <span className="text-lg font-bold leading-snug text-slate-900 dark:text-white">
+                          <span className="text-base font-bold leading-snug text-slate-900 dark:text-white">
                             {selectedVehicle
                               ? `${selectedVehicle.brand_name || ''} ${selectedVehicle.vehicle_model_name || ''} (${selectedVehicle.year || '—'})`.trim()
                               : 'Select vehicle'}
                           </span>
                           {!isLocked && (
                             <ChevronDown
-                              size={20}
+                              size={18}
                               className={`mt-0.5 shrink-0 text-slate-400 transition ${vehOpen ? 'rotate-180' : ''}`}
                               aria-hidden
                             />
                           )}
                         </button>
-                        {vehOpen && form.customer ? (
-                          <div className="absolute left-0 right-0 z-50 mt-2 max-h-52 overflow-auto rounded-xl border border-slate-200 bg-white py-1 shadow-lg backdrop-blur-md dark:border-slate-800 dark:bg-slate-900/90">
-                            {vehicles.map((v) => (
-                              <button
-                                key={v.id}
-                                type="button"
-                                onClick={() => {
-                                  setForm((p) => ({ ...p, vehicle: String(v.id) }))
-                                  setVehOpen(false)
-                                }}
-                                className="flex w-full items-center gap-2.5 px-3 py-2.5 text-left text-sm hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800"
-                              >
-                                {v.photo_url ? (
-                                  <img src={v.photo_url} alt="" className="h-6 w-6 shrink-0 rounded-md object-cover shadow-sm" />
-                                ) : (
-                                  <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-slate-100 text-slate-500 shadow-sm dark:bg-slate-800 dark:text-slate-400">
-                                    <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                                      <path d="M4 13h2l1.2-3.6h11.6L19 13h1M5.5 13v3.5h13V13M8 16.5h.01M16 16.5h.01" strokeLinecap="round" strokeLinejoin="round" />
-                                      <path d="M6 10.5L7 8h10l1 2.5" strokeLinecap="round" strokeLinejoin="round" />
-                                    </svg>
-                                  </div>
-                                )}
-                                <span className="truncate">{v.registration_no} · {v.brand_name} {v.vehicle_model_name}</span>
-                              </button>
-                            ))}
+                        {vehOpen ? (
+                          <div className="absolute left-0 right-0 z-50 mt-2 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg backdrop-blur-md dark:border-slate-800 dark:bg-slate-900/90">
+                            <div className="flex items-center gap-2 border-b border-slate-100 px-3 py-2 dark:border-slate-800">
+                              <Search size={14} className="shrink-0 text-slate-400" />
+                              <input
+                                ref={vehSearchInputRef}
+                                value={vehSearch}
+                                onChange={(e) => setVehSearch(e.target.value)}
+                                placeholder="Search by plate, brand, model, owner…"
+                                className="w-full bg-transparent text-sm outline-none placeholder:text-slate-400 dark:text-white dark:placeholder:text-slate-500"
+                              />
+                            </div>
+                            <div className="max-h-52 overflow-auto py-1">
+                              {filteredVehicles.length === 0 ? (
+                                <p className="px-3 py-3 text-center text-sm text-slate-400">No matches found.</p>
+                              ) : (
+                                filteredVehicles.map((v) => (
+                                  <button
+                                    key={v.id}
+                                    type="button"
+                                    onClick={() => {
+                                      setForm((p) => ({ ...p, vehicle: String(v.id), customer: String(v.customer) }))
+                                      setVehOpen(false)
+                                    }}
+                                    className="flex w-full items-center gap-2.5 px-3 py-2.5 text-left text-sm hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800"
+                                  >
+                                    {v.photo_url ? (
+                                      <img src={v.photo_url} alt="" className="h-6 w-6 shrink-0 rounded-md object-cover shadow-sm" />
+                                    ) : (
+                                      <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-slate-100 text-slate-500 shadow-sm dark:bg-slate-800 dark:text-slate-400">
+                                        <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                                          <path d="M4 13h2l1.2-3.6h11.6L19 13h1M5.5 13v3.5h13V13M8 16.5h.01M16 16.5h.01" strokeLinecap="round" strokeLinejoin="round" />
+                                          <path d="M6 10.5L7 8h10l1 2.5" strokeLinecap="round" strokeLinejoin="round" />
+                                        </svg>
+                                      </div>
+                                    )}
+                                    <span className="min-w-0 flex-1 truncate">{v.registration_no} · {v.brand_name} {v.vehicle_model_name}</span>
+                                  </button>
+                                ))
+                              )}
+                            </div>
                           </div>
                         ) : null}
                       </div>
-                      <div className="mt-5 grid grid-cols-2 gap-4 border-t border-slate-100 pt-4 dark:border-slate-800">
+                      <div className="mt-3 grid grid-cols-2 gap-3 border-t border-slate-100 pt-3 dark:border-slate-800 sm:grid-cols-4">
                         <div>
                           <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 dark:text-slate-500">Plate</p>
-                          <p className="mt-1.5 text-base font-semibold tracking-wide text-slate-900 dark:text-white">
+                          <p className="mt-1 text-sm font-semibold tracking-wide text-slate-900 dark:text-white">
                             {selectedVehicle?.registration_no || '—'}
                           </p>
                         </div>
                         <div className="min-w-0">
                           <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 dark:text-slate-500">VIN</p>
-                          <div className="mt-1.5 flex flex-wrap items-center gap-2">
-                            <span className="break-all font-mono text-sm font-medium text-slate-800 dark:text-slate-200">
+                          <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                            <span className="break-all font-mono text-xs font-medium text-slate-800 dark:text-slate-200">
                               {vinRevealed || !displayVin ? displayVin || '—' : maskVin(displayVin)}
                             </span>
                             {displayVin ? (
                               <button
                                 type="button"
                                 onClick={() => setVinRevealed((r) => !r)}
-                                className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-slate-600 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400 dark:hover:bg-slate-800"
+                                className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-slate-600 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400 dark:hover:bg-slate-800"
                               >
-                                <Lock size={11} />
+                                <Lock size={10} />
                                 {vinRevealed ? 'Mask' : 'Reveal'}
                               </button>
                             ) : null}
                           </div>
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 dark:text-slate-500">Customer</p>
+                          <p className="mt-1 truncate text-sm font-semibold tracking-wide text-slate-900 dark:text-white">
+                            {selectedCustomer?.full_name || '—'}
+                          </p>
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 dark:text-slate-500">Phone</p>
+                          <p className="mt-1 flex items-center gap-1.5 text-xs font-medium text-slate-800 dark:text-slate-200">
+                            <Phone size={12} className="shrink-0 text-slate-400 dark:text-slate-500" strokeWidth={2} aria-hidden />
+                            <span className="min-w-0 truncate">{displayPhone}</span>
+                          </p>
                         </div>
                       </div>
                     </div>
@@ -1109,12 +1184,9 @@ export default function AdminJobCardEditor() {
           {/* Main column: services & lines · Sidebar: financial summary (starts beside services) */}
           <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-3">
             <div className="min-w-0 space-y-6 lg:col-span-2">
-              <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-[0_1px_3px_rgba(15,23,42,0.06)] backdrop-blur-sm dark:border-slate-800 dark:bg-slate-900/40">
-                <h2 className="text-base font-bold text-slate-900 dark:text-white">Add services</h2>
-                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                  Search the catalog, pick a row in the list, then click Add service. Recent chips add in one tap. Tax (alloc.) uses each line&apos;s catalog GST%; header discount is split pro‑rata before line tax is rounded.
-                </p>
-                <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-start">
+              <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-[0_1px_3px_rgba(15,23,42,0.06)] backdrop-blur-sm dark:border-slate-800 dark:bg-slate-900/40">
+                <h2 className="text-sm font-bold text-slate-900 dark:text-white">Add services</h2>
+                <div className="mt-2.5 flex flex-col gap-2 sm:flex-row sm:items-start">
                   <div ref={serviceComboRef} className="relative min-w-0 flex-1">
                     <div className="relative">
                       <Search
@@ -1175,7 +1247,7 @@ export default function AdminJobCardEditor() {
                             : undefined
                         }
                         disabled={isLocked}
-                        className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-10 pr-11 text-sm shadow-sm outline-none transition focus:border-slate-300 focus:ring-2 focus:ring-slate-900/10 disabled:bg-slate-50 disabled:text-slate-400 dark:border-slate-800 dark:bg-slate-900 dark:text-white dark:focus:border-slate-700 dark:disabled:bg-slate-800/50"
+                        className="w-full rounded-xl border border-slate-200 bg-white py-2 pl-10 pr-11 text-sm shadow-sm outline-none transition focus:border-slate-300 focus:ring-2 focus:ring-slate-900/10 disabled:bg-slate-50 disabled:text-slate-400 dark:border-slate-800 dark:bg-slate-900 dark:text-white dark:focus:border-slate-700 dark:disabled:bg-slate-800/50"
                       />
                       <button
                         type="button"
@@ -1306,36 +1378,34 @@ export default function AdminJobCardEditor() {
                     type="button"
                     onClick={() => addServiceFromCombo()}
                     disabled={isLocked || !serviceSearch.trim() || !filteredServices.some(s => s.name === serviceSearch)}
-                    className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition disabled:cursor-not-allowed disabled:opacity-50 hover:opacity-95"
+                    className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-xl px-4 py-2 text-sm font-semibold text-white shadow-sm transition disabled:cursor-not-allowed disabled:opacity-50 hover:opacity-95"
                     style={{ backgroundColor: theme.accent }}
                   >
-                    <Plus size={18} strokeWidth={2.25} aria-hidden />
+                    <Plus size={16} strokeWidth={2.25} aria-hidden />
                     Add service
                   </button>
                 </div>
                 {recentIds.some((rid) => serviceItems.find((x) => String(x.id) === rid)) ? (
-                  <div className="mt-4">
-                    <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">
-                      Recent
-                    </p>
-                    <div className="mt-2 flex flex-wrap gap-2">
+                  <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
+                    <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400 dark:text-slate-500">
+                      Recent:
+                    </span>
                       {recentIds.map((rid) => {
                         const s = serviceItems.find((x) => String(x.id) === rid)
                         if (!s) return null
                         return (
                           <div
                             key={rid}
-                            className="inline-flex overflow-hidden rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-800 shadow-sm transition hover:border-slate-300 hover:shadow-md"
+                            className="inline-flex overflow-hidden rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-800 shadow-sm transition hover:border-slate-300 hover:shadow-md dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
                           >
                             <button
                               type="button"
                               onClick={() => !isLocked && addLineFromService(s)}
                               disabled={isLocked}
-                              className="inline-flex min-w-0 items-center gap-1.5 px-3 py-2 text-left hover:bg-slate-50/90 disabled:cursor-default"
+                              className="inline-flex min-w-0 items-center gap-1.5 px-2.5 py-1 text-left hover:bg-slate-50/90 disabled:cursor-default dark:hover:bg-slate-800/60"
                             >
-                              <span className="shrink-0 text-slate-500">Recent:</span>
-                              <span className="max-w-[12rem] truncate">{s.name}</span>
-                              <span className="tabular-nums text-slate-500">{fmtMoney(s.base_price)}</span>
+                              <span className="max-w-[10rem] truncate">{s.name}</span>
+                              <span className="tabular-nums text-slate-500 dark:text-slate-400">{fmtMoney(s.base_price)}</span>
                             </button>
                             {!isLocked && (
                               <button
@@ -1345,7 +1415,7 @@ export default function AdminJobCardEditor() {
                                   removeRecentId(rid)
                                   setRecentIds(readRecentIds())
                                 }}
-                                className="flex shrink-0 items-center border-l border-slate-200 px-2 py-2 text-slate-400 transition hover:bg-rose-50 hover:text-rose-600"
+                                className="flex shrink-0 items-center border-l border-slate-200 px-1.5 py-1 text-slate-400 transition hover:bg-rose-50 hover:text-rose-600 dark:border-slate-700"
                               >
                                 <X size={15} strokeWidth={2.25} aria-hidden />
                               </button>
@@ -1353,150 +1423,45 @@ export default function AdminJobCardEditor() {
                           </div>
                         )
                       })}
-                    </div>
                   </div>
                 ) : null}
               </section>
 
-              <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-[0_1px_3px_rgba(15,23,42,0.06)] backdrop-blur-sm dark:border-slate-800 dark:bg-slate-900/40">
-                <div className="border-b border-slate-100 px-5 py-4 dark:border-slate-800">
-                  <h2 className="text-base font-bold text-slate-900 dark:text-white">Applied services</h2>
-                </div>
-                <div className="overflow-x-auto">
-                  <table className="min-w-full text-left text-sm">
-                    <thead className="bg-slate-50 text-xs font-bold uppercase tracking-wider text-slate-500 dark:bg-slate-800/50 dark:text-slate-400">
-                      <tr>
-                        <th className="px-5 py-4 text-[10px] tracking-widest">Service</th>
-                        <th className="px-5 py-4 text-right text-[10px] tracking-widest">Qty</th>
-                        <th className="px-5 py-4 text-right text-[10px] tracking-widest">Unit price</th>
-                        <th className="px-5 py-4 text-right text-[10px] tracking-widest">Tax (alloc.)</th>
-                        <th className="px-5 py-4 text-right text-[10px] tracking-widest">Total</th>
-                        <th className="px-5 py-4 w-12" />
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                      {form.line_items.length === 0 ? (
+              {[
+                { title: 'Parts', rows: partRows, total: partsTotal },
+                { title: 'Labour', rows: labourRows, total: labourTotal },
+              ]
+                .filter(({ rows }) => rows.length > 0)
+                .map(({ title, rows, total }) => (
+                <section
+                  key={title}
+                  className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-[0_1px_3px_rgba(15,23,42,0.06)] backdrop-blur-sm dark:border-slate-800 dark:bg-slate-900/40"
+                >
+                  <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4 dark:border-slate-800">
+                    <h2 className="text-base font-bold text-slate-900 dark:text-white">{title}</h2>
+                    <span className="text-sm font-semibold text-slate-500 dark:text-slate-400">
+                      Total: {fmtMoney(total)}
+                    </span>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full text-left text-sm">
+                      <thead className="bg-slate-50 text-xs font-bold uppercase tracking-wider text-slate-500 dark:bg-slate-800/50 dark:text-slate-400">
                         <tr>
-                          <td colSpan={6} className="px-5 py-12 text-center">
-                            <p className="text-sm font-medium text-slate-600 dark:text-slate-400">No lines yet</p>
-                            <p className="mt-1 text-xs text-slate-500 dark:text-slate-500">
-                              Select a predefined service in the dropdown and click{' '}
-                              <span className="font-semibold text-slate-700 dark:text-slate-300">Add service</span>, or use a recent chip.
-                            </p>
-                          </td>
+                          <th className="px-5 py-4 text-[10px] tracking-widest">Service</th>
+                          <th className="px-5 py-4 text-right text-[10px] tracking-widest">Qty</th>
+                          <th className="px-5 py-4 text-right text-[10px] tracking-widest">Unit price</th>
+                          <th className="px-5 py-4 text-right text-[10px] tracking-widest">Tax (alloc.)</th>
+                          <th className="px-5 py-4 text-right text-[10px] tracking-widest">Total</th>
+                          <th className="px-5 py-4 w-12" />
                         </tr>
-                      ) : null}
-                      {form.line_items.map((row) => {
-                        const hasCatalog = resolveServiceItemPk(row, serviceItems) != null
-                        const hasDesc = Boolean((row.description || '').trim())
-                        const isDraft = !hasDesc && !hasCatalog
-                        const lineNet =
-                          Math.max(
-                            0,
-                            Math.round(((Number(row.quantity) || 0) * (Number(row.unit_price) || 0) - (Number(row.discount_amount) || 0)) * 100) / 100,
-                          )
-                        const tax = preview.taxByKey.get(row.key) ?? 0
-                        return (
-                          <tr
-                            key={row.key}
-                            className={`align-top transition-colors ${isDraft ? 'bg-amber-50/35 dark:bg-amber-900/10' : 'hover:bg-slate-50/50 dark:hover:bg-slate-800/30'}`}
-                          >
-                            <td className="px-5 py-4">
-                              <input
-                                value={row.description}
-                                readOnly={isLocked}
-                                onChange={(e) =>
-                                  !isLocked && setForm((p) => ({
-                                    ...p,
-                                    line_items: p.line_items.map((r) => (r.key === row.key ? { ...r, description: e.target.value } : r)),
-                                  }))
-                                }
-                                className={`w-full min-w-[160px] border-0 bg-transparent p-0 font-bold text-slate-900 outline-none focus:ring-0 dark:text-slate-100 ${isLocked ? 'cursor-default' : ''}`}
-                                placeholder="Service name"
-                                autoComplete="off"
-                              />
-                              <input
-                                value={row.detail_text}
-                                readOnly={isLocked}
-                                onChange={(e) =>
-                                  !isLocked && setForm((p) => ({
-                                    ...p,
-                                    line_items: p.line_items.map((r) => (r.key === row.key ? { ...r, detail_text: e.target.value } : r)),
-                                  }))
-                                }
-                                className={`mt-1 w-full min-w-[160px] border-0 bg-transparent p-0 text-xs text-slate-500 outline-none focus:ring-0 dark:text-slate-400 ${isLocked ? 'cursor-default' : ''}`}
-                                placeholder="Detail / spec (optional)"
-                                autoComplete="off"
-                              />
-                              {(() => {
-                                const pk = parseServiceItemPk(row.service_item) ?? resolveServiceItemPk(row, serviceItems)
-                                const item = pk ? serviceItems.find((s) => String(s.id) === pk) : null
-                                const categoryName = item?.category_name || null
-                                return categoryName ? (
-                                  <p className="mt-1 text-xs text-slate-500 dark:text-slate-500">{categoryName}</p>
-                                ) : null
-                              })()}
-                            </td>
-                            <td className="px-5 py-4 text-right tabular-nums">
-                              <input
-                                type="number"
-                                step="0.001"
-                                min="0"
-                                value={row.quantity}
-                                readOnly={isLocked}
-                                onChange={(e) =>
-                                  !isLocked && setForm((p) => ({
-                                    ...p,
-                                    line_items: p.line_items.map((r) => (r.key === row.key ? { ...r, quantity: e.target.value } : r)),
-                                  }))
-                                }
-                                className="w-20 rounded-lg border border-slate-200 bg-white px-2 py-1 text-right tabular-nums focus:border-slate-300 outline-none dark:border-slate-800 dark:bg-slate-900 dark:text-white dark:focus:border-slate-700 disabled:opacity-50"
-                                disabled={isLocked}
-                              />
-                            </td>
-                            <td className="px-5 py-4 text-right tabular-nums">
-                              <input
-                                type="number"
-                                step="0.01"
-                                min="0"
-                                value={row.unit_price}
-                                readOnly={isLocked}
-                                onChange={(e) =>
-                                  !isLocked && setForm((p) => ({
-                                    ...p,
-                                    line_items: p.line_items.map((r) => (r.key === row.key ? { ...r, unit_price: e.target.value } : r)),
-                                  }))
-                                }
-                                className="w-28 rounded-lg border border-slate-200 bg-white px-2 py-1 text-right tabular-nums focus:border-slate-300 outline-none dark:border-slate-800 dark:bg-slate-900 dark:text-white dark:focus:border-slate-700 disabled:opacity-50"
-                                disabled={isLocked}
-                              />
-                            </td>
-                            <td className="px-5 py-4 text-right tabular-nums text-slate-600">{fmtMoney(tax)}</td>
-                            <td className="px-5 py-4 text-right font-semibold tabular-nums text-slate-900">{fmtMoney(lineNet + tax)}</td>
-                            <td className="px-5 py-4">
-                              {!isLocked && (
-                                <button
-                                  type="button"
-                                  aria-label="Remove line"
-                                  onClick={() =>
-                                    setForm((p) => ({
-                                      ...p,
-                                      line_items: p.line_items.filter((r) => r.key !== row.key),
-                                    }))
-                                  }
-                                  className="rounded-lg p-2 text-rose-600 hover:bg-rose-50"
-                                >
-                                  <Trash2 size={16} />
-                                </button>
-                              )}
-                            </td>
-                          </tr>
-                        )
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </section>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                        {rows.map(renderLineRow)}
+                      </tbody>
+                    </table>
+                  </div>
+                </section>
+              ))}
 
               <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-[0_1px_3px_rgba(15,23,42,0.06)] backdrop-blur-sm dark:border-slate-800 dark:bg-slate-900/40">
                 <h2 className="text-base font-bold text-slate-900 dark:text-white">Internal staff notes</h2>

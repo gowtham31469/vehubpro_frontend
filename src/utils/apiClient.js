@@ -140,14 +140,14 @@ export async function apiFetch(path, options = {}, { retryOnAuthError = true } =
       const retryResponse = await fetch(`${API_BASE_URL}${path}`, { ...options, headers: retryHeaders })
       const retryText = await retryResponse.text()
       const retryPayload = parseJsonSafe(retryText)
-      return { response: retryResponse, payload: retryPayload }
+      return { response: retryResponse, payload: retryPayload, text: retryText }
     } catch {
       clearSession()
       throw new Error('SESSION_EXPIRED')
     }
   }
 
-  return { response, payload }
+  return { response, payload, text }
 }
 
 export function unwrapData(payload) {

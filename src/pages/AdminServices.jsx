@@ -18,7 +18,12 @@ import {
 } from '../utils/services'
 
 const emptyCategory = { name: '', applicable_vehicle_types: [], is_active: true }
-const emptyItem = { category: '', name: '', description: '', base_price: '', hsn_code: '', gst_percentage: '', applicable_vehicle_types: [], is_active: true }
+const SERVICE_TYPE_OPTIONS = [
+  { value: 'labour', label: 'Labour' },
+  { value: 'part', label: 'Part' },
+]
+
+const emptyItem = { category: '', name: '', description: '', service_type: '', base_price: '', hsn_code: '', gst_percentage: '', applicable_vehicle_types: [], is_active: true }
 
 export default function AdminServices() {
   const { theme } = useTenantBranding()
@@ -286,6 +291,7 @@ export default function AdminServices() {
       category: String(item.category || ''),
       name: item.name || '',
       description: item.description || '',
+      service_type: item.service_type || '',
       base_price: item.base_price ?? '',
       hsn_code: item.hsn_code || '',
       gst_percentage: item.gst_percentage ?? '',
@@ -315,13 +321,16 @@ export default function AdminServices() {
     setItemModalError('')
     const name = itemForm.name.trim()
     if (!itemForm.category || !name) { setItemModalError('Category and name are required.'); return }
+    if (!itemForm.service_type) { setItemModalError('Service type is required.'); return }
     if (itemForm.base_price === '' || Number(itemForm.base_price) < 0) { setItemModalError('Valid base price is required.'); return }
+    if ((itemForm.applicable_vehicle_types || []).length === 0) { setItemModalError('At least one vehicle type is required.'); return }
     setItemSaving(true)
     try {
       const payload = {
         category: itemForm.category,
         name,
         description: itemForm.description.trim(),
+        service_type: itemForm.service_type,
         base_price: String(itemForm.base_price),
         hsn_code: itemForm.hsn_code.trim(),
         gst_percentage: String(itemForm.gst_percentage || 0),
@@ -708,7 +717,9 @@ export default function AdminServices() {
 
               {/* Category dropdown */}
               <div>
-                <label className="mb-1 block text-xs font-semibold text-slate-500 dark:text-slate-400">Category</label>
+                <label className="mb-1 block text-xs font-semibold text-slate-500 dark:text-slate-400">
+                  Category <span className="text-rose-500">*</span>
+                </label>
                 <div className="relative" ref={catModalDropdownRef}>
                   <button
                     type="button"
@@ -749,9 +760,38 @@ export default function AdminServices() {
                 </div>
               </div>
 
+              {/* Service type */}
+              <div>
+                <label className="mb-1 block text-xs font-semibold text-slate-500 dark:text-slate-400">
+                  Service Type <span className="text-rose-500">*</span>
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  {SERVICE_TYPE_OPTIONS.map((opt) => {
+                    const sel = itemForm.service_type === opt.value
+                    return (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        onClick={() => { setItemModalError(''); setItemForm((p) => ({ ...p, service_type: opt.value })) }}
+                        className={`rounded-xl border px-3 py-2.5 text-sm font-semibold transition ${
+                          sel
+                            ? 'border-transparent text-white'
+                            : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:border-slate-300 dark:hover:border-slate-600'
+                        }`}
+                        style={sel ? { backgroundColor: theme.accent } : undefined}
+                      >
+                        {opt.label}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+
               {/* Name */}
               <div>
-                <label className="mb-1 block text-xs font-semibold text-slate-500 dark:text-slate-400">Name</label>
+                <label className="mb-1 block text-xs font-semibold text-slate-500 dark:text-slate-400">
+                  Name <span className="text-rose-500">*</span>
+                </label>
                 <input
                   value={itemForm.name}
                   onChange={(e) => { setItemModalError(''); setItemForm((p) => ({ ...p, name: e.target.value })) }}
@@ -775,7 +815,9 @@ export default function AdminServices() {
               {/* Price + GST row */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="mb-1 block text-xs font-semibold text-slate-500 dark:text-slate-400">Base Price (₹)</label>
+                  <label className="mb-1 block text-xs font-semibold text-slate-500 dark:text-slate-400">
+                    Base Price (₹) <span className="text-rose-500">*</span>
+                  </label>
                   <input
                     type="number"
                     step="0.01"
@@ -814,7 +856,9 @@ export default function AdminServices() {
 
                 {/* Vehicle type */}
                 <div>
-                  <label className="mb-1 block text-xs font-semibold text-slate-500 dark:text-slate-400">Vehicle Type</label>
+                  <label className="mb-1 block text-xs font-semibold text-slate-500 dark:text-slate-400">
+                    Vehicle Type <span className="text-rose-500">*</span>
+                  </label>
                   <div className="relative" ref={vtItemDropdownRef}>
                     <button
                       type="button"

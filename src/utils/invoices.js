@@ -20,6 +20,15 @@ export async function getInvoice(id) {
   return parseResponse(`/api/v1/invoices/${id}/`, { method: 'GET' }, 'Failed to load invoice.')
 }
 
+/** Raw HTML (same template used to generate the PDF) for embedding in an iframe preview. */
+export async function fetchInvoicePreviewHtml(id) {
+  const { response, text } = await apiFetch(`/api/v1/invoices/${id}/preview-html/`, { method: 'GET' })
+  if (!response.ok) {
+    throw new Error('Failed to load invoice preview.')
+  }
+  return text
+}
+
 export async function recordPayment(id, payload) {
   return parseResponse(
     `/api/v1/invoices/${id}/record-payment/`,

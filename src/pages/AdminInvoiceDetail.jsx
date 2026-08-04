@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import {
   ArrowLeft,
@@ -10,7 +10,7 @@ import {
 import AdminShell from '../components/AdminShell'
 import { useToast } from '../context/ToastContext.jsx'
 import { useTenantBranding } from '../context/TenantBrandingContext.jsx'
-import { generateInvoicePdf, getInvoice, recordPayment } from '../utils/invoices'
+import { fetchInvoicePreviewHtml, generateInvoicePdf, getInvoice, recordPayment } from '../utils/invoices'
 
 const PAYMENT_MODES = [
   { value: 'cash', label: 'Cash' },
@@ -22,11 +22,6 @@ const PAYMENT_MODES = [
 
 function fmtMoney(n) {
   return `₹${Number(n || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-}
-
-function formatDate(iso) {
-  if (!iso) return '—'
-  return new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
 }
 
 function formatDateTime(iso) {
@@ -133,287 +128,36 @@ function PaymentModal({ invoice, onClose, onSuccess }) {
   )
 }
 
-// ── Invoice document (print-ready) ────────────────────────────────────────────
-function InvoiceDocument({ invoice, theme, brandingLogoUrl }) {
-  const isPaid = invoice.payment_status === 'paid'
-  const isPartial = invoice.payment_status === 'partial'
-  const balance = Math.max(0, Number(invoice.total_amount) - Number(invoice.amount_paid || 0))
+// ── Invoice preview (embeds the exact same HTML used to generate the PDF,
+//     via the /preview-html/ endpoint, so the on-screen preview is always
+//     pixel-identical to the download rather than a hand-maintained replica) ──
+function InvoicePreviewFrame({ html }) {
+  const iframeRef = useRef(null)
+  const [height, setHeight] = useState(600)
 
-  // Compute GST total
-  const totalGst = Number(invoice.cgst_amount || 0) + Number(invoice.sgst_amount || 0) + Number(invoice.igst_amount || 0)
+  // Hide the standalone document's own Back/Print toolbar — this page already
+  // has its own Back / Download PDF actions above the preview.
+  const srcDoc = html.replace('</head>', '<style>.no-print{display:none!important}</style></head>')
 
-  // derive a tax % label if possible from the lines
-  const gstRates = [...new Set((invoice.line_items || []).map((l) => Number(l.gst_percentage)).filter(Boolean))]
-  const gstLabel = gstRates.length === 1 ? `${gstRates[0]}%` : 'GST'
+  const resize = () => {
+    try {
+      const doc = iframeRef.current?.contentWindow?.document
+      const h = doc?.body?.scrollHeight
+      if (h) setHeight(h + 24)
+    } catch {
+      // cross-origin or not-yet-ready — keep current height
+    }
+  }
 
   return (
-    <div
-      id="invoice-print"
-      className="relative mx-auto w-full max-w-[720px] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-lg print:rounded-none print:border-0 print:shadow-none"
-    >
-      {/* Paid watermark stripe */}
-      {isPaid && (
-        <div className="absolute left-0 right-0 top-0 z-10 bg-emerald-500 py-0.5 text-center text-[10px] font-bold uppercase tracking-[0.2em] text-white">
-          Fully Paid
-        </div>
-      )}
-
-      <div className="px-10 pt-10 pb-8" style={{ paddingTop: isPaid ? '28px' : '40px' }}>
-
-        {/* ── Top: Brand + Invoice label ── */}
-        <div className="flex items-stretch justify-between gap-6">
-          {/* Left: Company */}
-          <div className="flex flex-col">
-            <div className="flex items-center gap-2">
-              {brandingLogoUrl ? (
-                <img src={brandingLogoUrl} alt="Logo" className="h-12 w-auto object-contain" />
-              ) : (
-                <div
-                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-white"
-                  style={{ backgroundColor: theme.accent ?? '#1e3a8a' }}
-                >
-                  <svg className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M8 7h8M4 13h16M6 10l1.5-4h9L18 10M5 13v6a1 1 0 001 1h2a1 1 0 001-1v-4h6v4a1 1 0 001 1h2a1 1 0 001-1v-6" />
-                  </svg>
-                </div>
-              )}
-              <span className="text-xl font-black uppercase tracking-tight text-slate-900 ml-1">
-                {invoice.tenant_name_snapshot || 'AUTOCARE PRO'}
-              </span>
-            </div>
-            <div className="mt-4 space-y-0.5 text-xs text-slate-500 leading-relaxed font-medium max-w-[280px]">
-              {invoice.tenant_address_snapshot && (
-                <p className="whitespace-pre-wrap">{invoice.tenant_address_snapshot}</p>
-              )}
-              {invoice.tenant_gstin_snapshot && (
-                <p className="mt-2 font-bold text-slate-600">GSTIN: {invoice.tenant_gstin_snapshot}</p>
-              )}
-            </div>
-          </div>
-
-          {/* Right: Invoice title + meta */}
-          <div className="flex flex-col justify-between items-end text-right">
-            <div>
-              <p className="text-4xl font-black uppercase tracking-tight leading-none" style={{ color: theme.accent ?? '#1e3a8a' }}>
-                INVOICE
-              </p>
-              <p className="mt-2 text-sm font-bold text-slate-900">#{invoice.invoice_number}</p>
-            </div>
-            <div className="mt-6 flex gap-6 text-left">
-              <div>
-                <p className="text-[10px] font-bold uppercase tracking-[0.05em] text-slate-400">Date Issued</p>
-                <p className="mt-0.5 text-xs font-bold text-slate-700">{formatDate(invoice.created_at)}</p>
-              </div>
-              <div>
-                <p className="text-[10px] font-bold uppercase tracking-[0.05em] text-slate-400">Job Card</p>
-                <p className="mt-0.5 text-xs font-bold text-slate-700">
-                  {invoice.job_card ? `#${String(invoice.job_card).slice(0, 8).toUpperCase()}` : '—'}
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* ── Divider ── */}
-        <div className="my-7 h-px bg-slate-100" />
-
-        {/* ── Bill To + Vehicle Details ── */}
-        <div className="grid grid-cols-2 gap-8">
-          {/* Customer */}
-          <div>
-            <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-slate-400">Bill To</p>
-            {invoice.is_pii_erased ? (
-              <p className="mt-1 text-sm text-slate-400 italic">[Customer data erased]</p>
-            ) : (
-              <>
-                <p className="mt-1 text-base font-bold text-slate-900">{invoice.customer_name || '—'}</p>
-                <div className="mt-1 space-y-0.5 text-xs text-slate-500 font-medium leading-relaxed max-w-[250px]">
-                  {invoice.customer_address && <p className="whitespace-pre-wrap">{invoice.customer_address}</p>}
-                  {invoice.customer_phone && <p>{invoice.customer_phone}</p>}
-                  {invoice.customer_email && <p>{invoice.customer_email}</p>}
-                  {invoice.customer_gstin && <p className="font-semibold text-slate-600">GSTIN: {invoice.customer_gstin}</p>}
-                </div>
-              </>
-            )}
-          </div>
-
-          {/* Vehicle */}
-          <div>
-            <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-slate-400">Vehicle Details</p>
-            <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-4">
-              <div>
-                <p className="text-[9px] font-bold uppercase tracking-[0.05em] text-slate-400">Make / Model</p>
-                <p className="mt-0.5 text-sm font-bold text-slate-900">{invoice.vehicle_label_snapshot || '—'}</p>
-              </div>
-              <div>
-                <p className="text-[9px] font-bold uppercase tracking-[0.05em] text-slate-400">License Plate</p>
-                <p className="mt-0.5 font-mono text-sm font-bold text-slate-900">{invoice.vehicle_registration_no_snapshot || '—'}</p>
-              </div>
-              <div>
-                <p className="text-[9px] font-bold uppercase tracking-[0.05em] text-slate-400">VIN</p>
-                <p className="mt-0.5 font-mono text-xs font-bold text-slate-900">{invoice.vehicle_vin_snapshot || '—'}</p>
-              </div>
-              <div>
-                <p className="text-[9px] font-bold uppercase tracking-[0.05em] text-slate-400">Odometer</p>
-                <p className="mt-0.5 text-xs font-bold text-slate-900">
-                  {invoice.vehicle_odometer_snapshot ? `${invoice.vehicle_odometer_snapshot.toLocaleString()} km` : '—'}
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* ── Divider ── */}
-        <div className="my-7 border-t border-slate-300" />
-
-        {/* ── Line items table ── */}
-        {(invoice.line_items || []).length === 0 ? (
-          <p className="py-8 text-center text-sm text-slate-400">No line items on this invoice.</p>
-        ) : (
-          <div className="grid grid-cols-[1fr_auto_auto_auto] gap-x-6">
-            {/* Header */}
-            <p className="border-b border-slate-200 pb-2 text-[9px] font-bold uppercase tracking-[0.22em] text-slate-400">Description</p>
-            <p className="border-b border-slate-200 pb-2 text-right text-[9px] font-bold uppercase tracking-[0.22em] text-slate-400">Qty / Hrs</p>
-            <p className="border-b border-slate-200 pb-2 text-right text-[9px] font-bold uppercase tracking-[0.22em] text-slate-400">Unit Price</p>
-            <p className="border-b border-slate-200 pb-2 text-right text-[9px] font-bold uppercase tracking-[0.22em] text-slate-400">Amount</p>
-
-            {/* Rows */}
-            {(invoice.line_items || []).map((line) => (
-              <React.Fragment key={line.id}>
-                <div className="border-b border-slate-100 py-4">
-                  <p className="text-sm font-bold text-slate-900">{line.description}</p>
-                  {line.detail_text && (
-                    <p className="mt-0.5 text-xs italic text-slate-500">{line.detail_text}</p>
-                  )}
-                  {line.hsn_sac_code && (
-                    <p className="mt-0.5 text-[10px] text-slate-400">HSN/SAC: {line.hsn_sac_code}</p>
-                  )}
-                </div>
-                <p className="border-b border-slate-100 py-4 text-right text-sm tabular-nums text-slate-700">{Number(line.quantity)}</p>
-                <p className="border-b border-slate-100 py-4 text-right text-sm tabular-nums text-slate-700">{fmtMoney(line.unit_price)}</p>
-                <p className="border-b border-slate-100 py-4 text-right text-sm font-semibold tabular-nums text-slate-900">{fmtMoney(line.line_total)}</p>
-              </React.Fragment>
-            ))}
-          </div>
-        )}
-
-        {/* ── Bottom: Notes + Totals ── */}
-        <div className="mt-6 space-y-3">
-          {/* Notes */}
-          {invoice.notes && (
-            <div className="border-l-4 border-sky-500 bg-sky-50 px-4 py-4 shadow-sm">
-              <p className="text-[8px] font-black uppercase tracking-widest text-sky-700">Technician Notes</p>
-              <p className="mt-2 text-xs leading-relaxed text-slate-700">"{invoice.notes}"</p>
-            </div>
-          )}
-
-          {/* Financials — same grid as line items so columns align */}
-          <div className="space-y-2">
-            <div className="grid grid-cols-[1fr_auto_auto_auto] gap-x-6 text-sm">
-              <span /><span />
-              <span className="text-right text-slate-500">Subtotal</span>
-              <span className="text-right tabular-nums font-medium text-slate-800">{fmtMoney(invoice.subtotal)}</span>
-            </div>
-            {Number(invoice.discount_amount) > 0 && (
-              <div className="grid grid-cols-[1fr_auto_auto_auto] gap-x-6 text-sm">
-                <span /><span />
-                <span className="text-right text-slate-500">Discount</span>
-                <span className="text-right tabular-nums font-medium text-rose-600">−{fmtMoney(invoice.discount_amount)}</span>
-              </div>
-            )}
-            {totalGst > 0 && (
-              <div className="grid grid-cols-[1fr_auto_auto_auto] gap-x-6 text-sm">
-                <span /><span />
-                <span className="text-right text-slate-500">
-                  {Number(invoice.cgst_amount) > 0 && Number(invoice.sgst_amount) > 0
-                    ? `CGST + SGST (${gstLabel})`
-                    : `GST (${gstLabel})`}
-                </span>
-                <span className="text-right tabular-nums text-slate-700">{fmtMoney(totalGst)}</span>
-              </div>
-            )}
-            {Number(invoice.shop_fees) > 0 && (
-              <div className="grid grid-cols-[1fr_auto_auto_auto] gap-x-6 text-sm">
-                <span /><span />
-                <span className="text-right text-slate-500">Shop fees</span>
-                <span className="text-right tabular-nums text-slate-700">{fmtMoney(invoice.shop_fees)}</span>
-              </div>
-            )}
-            <div
-              className="grid grid-cols-[1fr_auto_auto_auto] gap-x-6 border-t border-slate-200 pt-3 text-base font-black"
-              style={{ color: theme.accent }}
-            >
-              <span /><span />
-              <span className="text-right">TOTAL DUE</span>
-              <span className="text-right tabular-nums">{fmtMoney(invoice.total_amount)}</span>
-            </div>
-
-            {/* Payment status strip */}
-            <div className={`mt-6 rounded-lg py-4 text-center text-[11px] font-black uppercase tracking-widest shadow-sm ${
-              isPaid
-                ? 'bg-emerald-50 text-emerald-700'
-                : isPartial
-                ? 'bg-amber-50 text-amber-700'
-                : 'bg-rose-50 text-rose-700'
-            }`}>
-              {isPaid
-                ? '✓ Status: Fully Paid'
-                : isPartial
-                ? `◐ Status: Partially Paid · Balance ${fmtMoney(balance)}`
-                : '○ Status: Unpaid'}
-            </div>
-          </div>
-        </div>
-
-        {/* Recommendation */}
-        {invoice.next_service_recommendation && (
-          <div className="mt-5 border-l-4 border-amber-500 bg-amber-50 px-5 py-4 shadow-sm rounded-r-lg">
-            <p className="text-[7.5px] font-black uppercase tracking-widest text-amber-700 mb-2">💡 Next Service Recommendation</p>
-            <p className="text-xs leading-relaxed text-slate-800">{invoice.next_service_recommendation}</p>
-          </div>
-        )}
-
-        {/* ── Signatures Section ── */}
-        {(invoice.customer_signature || invoice.admin_signature) && (
-          <div className="mt-16 border-t-2 border-slate-100 pt-12 pb-4">
-            <div className="grid grid-cols-2 gap-20 px-8">
-              {/* Customer Signature */}
-              <div className="text-center">
-                <p className="text-[7.5px] font-black uppercase tracking-widest text-slate-700 mb-24">Customer Signature</p>
-                <div className="border-t-2 border-slate-900 h-24 flex items-end justify-center mb-2">
-                  {invoice.customer_signature && (
-                    <img src={invoice.customer_signature} alt="Customer Signature" className="max-h-24 max-w-full object-contain" />
-                  )}
-                </div>
-              </div>
-
-              {/* Admin Signature */}
-              <div className="text-center">
-                <p className="text-[7.5px] font-black uppercase tracking-widest text-slate-700 mb-24">Authorized By</p>
-                <div className="border-t-2 border-slate-900 h-24 flex items-end justify-center mb-2">
-                  {invoice.admin_signature && (
-                    <img src={invoice.admin_signature} alt="Admin Signature" className="max-h-24 max-w-full object-contain" />
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* ── Invoice footer ── */}
-        <div className="mt-12 border-t-2 border-slate-100 pt-6 text-center">
-          <p className="text-xs text-slate-600 leading-relaxed">Thank you for your business! We appreciate the opportunity to service your vehicle.</p>
-          {invoice.customer_signature || invoice.admin_signature ? (
-            <p className="mt-2 text-[9px] text-slate-500">✓ Signatures have been recorded.</p>
-          ) : (
-            <p className="mt-2 text-[9px] text-slate-500">This is a computer-generated invoice and does not require a signature.</p>
-          )}
-          {invoice.is_pii_erased && (
-            <p className="mt-3 text-[9px] text-slate-500">Customer identity data removed per data protection request.</p>
-          )}
-        </div>
-      </div>
-    </div>
+    <iframe
+      ref={iframeRef}
+      srcDoc={srcDoc}
+      onLoad={resize}
+      title="Invoice preview"
+      className="w-full rounded-2xl border border-slate-200 dark:border-slate-800 bg-white shadow-lg"
+      style={{ height, border: 'none' }}
+    />
   )
 }
 
@@ -421,10 +165,11 @@ function InvoiceDocument({ invoice, theme, brandingLogoUrl }) {
 export default function AdminInvoiceDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { theme, brandingLogoUrl } = useTenantBranding()
+  const { theme } = useTenantBranding()
   const { showToast } = useToast()
 
   const [invoice, setInvoice] = useState(null)
+  const [previewHtml, setPreviewHtml] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [paymentOpen, setPaymentOpen] = useState(false)
@@ -435,8 +180,9 @@ export default function AdminInvoiceDetail() {
     setLoading(true)
     setError('')
     try {
-      const data = await getInvoice(id)
+      const [data, html] = await Promise.all([getInvoice(id), fetchInvoicePreviewHtml(id)])
       setInvoice(data)
+      setPreviewHtml(html)
     } catch (e) {
       if (e.message === 'SESSION_EXPIRED') { globalThis.location.href = '/admin'; return }
       setError(e.message || 'Failed to load invoice.')
@@ -579,8 +325,12 @@ export default function AdminInvoiceDetail() {
               </div>
             </div>
 
-            {/* ── Invoice document ── */}
-            <InvoiceDocument invoice={invoice} theme={theme} brandingLogoUrl={brandingLogoUrl} />
+            {/* ── Invoice document — same HTML as the downloaded PDF ── */}
+            {previewHtml ? (
+              <InvoicePreviewFrame html={previewHtml} />
+            ) : (
+              <div className="py-20 text-center text-slate-400 dark:text-slate-500">Loading preview…</div>
+            )}
 
             {/* ── Payment history modal ── */}
             {historyOpen && (
