@@ -149,7 +149,7 @@ export default function InvoiceSettingsPanel() {
         <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field>
             <span className={label}>Account Holder Name</span>
-            <input className={inp} value={form.account_holder_name} onChange={set('account_holder_name')} placeholder="Cheziyan Cars" />
+            <input className={inp} value={form.account_holder_name} onChange={set('account_holder_name')} placeholder="Account Holder Name" />
           </Field>
           <Field>
             <span className={label}>Account Number</span>
@@ -208,7 +208,7 @@ export default function InvoiceSettingsPanel() {
           </Field>
           <Field>
             <span className={label}>UPI ID</span>
-            <input className={inp} value={form.upi_id} onChange={set('upi_id')} placeholder="cheziyancars058@tmb" />
+            <input className={inp} value={form.upi_id} onChange={set('upi_id')} placeholder="UPI ID" />
           </Field>
 
           <div>
