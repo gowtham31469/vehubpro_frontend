@@ -23,6 +23,7 @@ const MODULE_META = {
   'configuration':     { icon: SlidersHorizontal, to: '/admin/configuration' },
   'user_management':   { icon: Users,             to: '/admin/users' },
   'portfolio':         { icon: Briefcase,         to: '/admin/portfolio' },
+  'customer_management': { icon: Users,           to: '/admin/customers' },
 }
 
 // Explicit overrides for submodule keys → real frontend routes.
@@ -129,6 +130,7 @@ const FALLBACK_NAV = [
   { key: 'configuration',    name: 'Configuration',    submodules: [] },
 ]
 
+// Cleared on logout by apiClient.js's clearSession() — keep the key in sync.
 const NAV_CACHE_KEY = 'vehubpro_nav_modules'
 
 function getCachedNav() {

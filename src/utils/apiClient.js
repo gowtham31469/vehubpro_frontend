@@ -23,6 +23,9 @@ export function clearSession() {
   localStorage.removeItem('access_token')
   localStorage.removeItem('refresh_token')
   localStorage.removeItem('current_user')
+  // Must match AdminShell.jsx's NAV_CACHE_KEY — otherwise the next login in
+  // this tab reuses the previous session's sidebar instead of refetching it.
+  sessionStorage.removeItem('vehubpro_nav_modules')
 }
 
 export function getCurrentUser() {

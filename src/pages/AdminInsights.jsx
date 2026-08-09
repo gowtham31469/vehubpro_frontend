@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import {
   BadgeCheck, Car, CircleDollarSign, TrendingUp,
-  Users, WalletCards, AlertCircle, Wrench,
+  WalletCards, AlertCircle, Wrench,
 } from 'lucide-react'
 import AdminShell from '../components/AdminShell'
 import { useTenantBranding } from '../context/TenantBrandingContext.jsx'
@@ -129,9 +129,8 @@ export default function AdminInsights() {
         </div>
 
         {/* ── KPI cards ── */}
-        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
           {[
-            { label: 'Total Customers',     value: fmtCount(summary?.total_customers),      icon: Users,            delta: null },
             { label: 'Total Vehicles',       value: fmtCount(summary?.total_vehicles),       icon: Car,              delta: null },
             { label: 'Revenue This Month',   value: fmtMoney(summary?.revenue_this_month),   icon: CircleDollarSign, delta: null },
             { label: 'Outstanding Amount',   value: fmtMoney(summary?.outstanding_amount),   icon: AlertCircle,      delta: null },
