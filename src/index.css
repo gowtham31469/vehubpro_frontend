@@ -22,6 +22,12 @@ body {
   font-family: 'Inter', sans-serif;
 }
 
+/* Native date-input calendar icon renders dark by default, which is invisible
+   against our dark-mode input backgrounds — invert it so it stays visible. */
+.dark input[type='date']::-webkit-calendar-picker-indicator {
+  filter: invert(1);
+}
+
 @media print {
   body * { visibility: hidden; }
   #invoice-print, #invoice-print * { visibility: visible; }

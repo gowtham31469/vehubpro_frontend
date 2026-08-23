@@ -569,6 +569,7 @@ export default function AdminServices() {
                         <th className="px-6 py-4 w-14">Icon</th>
                         <th className="px-6 py-4">Category</th>
                         <th className="px-6 py-4">Name</th>
+                        <th className="px-6 py-4">Service Type</th>
                         <th className="px-6 py-4">Price</th>
                         <th className="px-6 py-4">GST %</th>
                         <th className="px-6 py-4 w-40 text-center">Actions</th>
@@ -590,6 +591,15 @@ export default function AdminServices() {
                             </td>
                             <td className="px-6 py-3 text-slate-600 dark:text-slate-400">{item.category_name}</td>
                             <td className="px-6 py-3 font-medium text-slate-900 dark:text-white">{item.name}</td>
+                            <td className="px-6 py-3">
+                              <span className={`rounded-full px-2.5 py-1 text-xs font-semibold capitalize ${
+                                item.service_type === 'labour'
+                                  ? 'bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400'
+                                  : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
+                              }`}>
+                                {item.service_type}
+                              </span>
+                            </td>
                             <td className="px-6 py-3 text-slate-600 dark:text-slate-400">₹{Number(item.base_price).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
                             <td className="px-6 py-3 text-slate-600 dark:text-slate-400">{item.gst_percentage}%</td>
 

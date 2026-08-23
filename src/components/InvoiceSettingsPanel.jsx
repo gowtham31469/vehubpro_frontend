@@ -11,6 +11,7 @@ const emptyForm = {
   account_holder_name: '', account_number: '', account_type: '',
   ifsc_code: '', bank_name: '', branch_name: '', upi_id: '',
   terms_and_conditions: '',
+  show_terms_and_conditions: true,
   currency_symbol: '₹', advance_payment_percentage: '100', estimate_charge_percentage: '3',
   replaced_parts_retention_days: '2', service_warranty_days: '30',
 }
@@ -71,6 +72,7 @@ export default function InvoiceSettingsPanel() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [qrFile, setQrFile] = useState(null)
+  const [togglingTerms, setTogglingTerms] = useState(false)
   const fileInputRef = useRef(null)
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }))
 
@@ -99,6 +101,7 @@ export default function InvoiceSettingsPanel() {
           branch_name: data?.branch_name ?? '',
           upi_id: data?.upi_id ?? '',
           terms_and_conditions: data?.terms_and_conditions ?? '',
+          show_terms_and_conditions: data?.show_terms_and_conditions ?? true,
           currency_symbol: data?.currency_symbol ?? '₹',
           advance_payment_percentage: data?.advance_payment_percentage ?? '100',
           estimate_charge_percentage: data?.estimate_charge_percentage ?? '3',
@@ -125,6 +128,27 @@ export default function InvoiceSettingsPanel() {
       showToast('error', e.message || 'Failed to save invoice settings.')
     } finally {
       setSaving(false)
+    }
+  }
+
+  // Unlike the rest of the form, this toggle saves immediately on click —
+  // matching how a switch is expected to behave, rather than staging a
+  // change that silently reverts if the user never scrolls down to Save.
+  const toggleShowTerms = async () => {
+    const next = !form.show_terms_and_conditions
+    setForm((f) => ({ ...f, show_terms_and_conditions: next }))
+    setTogglingTerms(true)
+    try {
+      const fd = new FormData()
+      fd.append('show_terms_and_conditions', next)
+      const updated = await updateMyInvoiceSettings(fd)
+      setSettings(updated)
+      showToast('success', next ? 'Terms & Conditions will show on invoice PDFs.' : 'Terms & Conditions hidden from invoice PDFs.')
+    } catch (e) {
+      setForm((f) => ({ ...f, show_terms_and_conditions: !next }))
+      showToast('error', e.message || 'Failed to update this setting.')
+    } finally {
+      setTogglingTerms(false)
     }
   }
 
@@ -245,8 +269,28 @@ export default function InvoiceSettingsPanel() {
       </div>
 
       <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800/60 dark:bg-slate-900/40">
-        <h3 className="text-base font-bold text-slate-900 dark:text-white">Terms & Conditions Variables</h3>
-        <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">Used to fill in placeholders inside your terms & conditions text below.</p>
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <h3 className="text-base font-bold text-slate-900 dark:text-white">Terms & Conditions Variables</h3>
+            <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">Used to fill in placeholders inside your terms & conditions text below.</p>
+          </div>
+          <label className="flex shrink-0 cursor-pointer items-center gap-2 text-xs font-semibold text-slate-500 dark:text-slate-400">
+            {form.show_terms_and_conditions ? 'Shown on invoice PDFs' : 'Hidden on invoice PDFs'}
+            <button
+              type="button"
+              role="switch"
+              aria-checked={form.show_terms_and_conditions}
+              disabled={togglingTerms}
+              onClick={toggleShowTerms}
+              className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition disabled:opacity-60 ${form.show_terms_and_conditions ? '' : 'bg-slate-300 dark:bg-slate-700'}`}
+              style={form.show_terms_and_conditions ? { backgroundColor: theme.accent } : undefined}
+            >
+              <span
+                className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition ${form.show_terms_and_conditions ? 'translate-x-6' : 'translate-x-1'}`}
+              />
+            </button>
+          </label>
+        </div>
 
         <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <Field>
@@ -275,7 +319,8 @@ export default function InvoiceSettingsPanel() {
           <span className={label}>Terms & Conditions</span>
           <textarea
             rows={10}
-            className={`${inp} font-mono text-xs`}
+            disabled={!form.show_terms_and_conditions}
+            className={`${inp} font-mono text-xs ${!form.show_terms_and_conditions ? 'opacity-50' : ''}`}
             value={form.terms_and_conditions}
             onChange={set('terms_and_conditions')}
             placeholder={'Pickup, drop-off, and test drives are undertaken at the customer’s own risk. {{tenant_name}} will exercise reasonable care…\n\nAn advance payment of {{advance_payment_percentage}}% of the quoted spare parts value must be paid before work commences.'}

@@ -15,9 +15,16 @@ import {
   updateBrand,
   updateModel,
 } from '../utils/vehicles'
+import {
+  createInventoryFeature,
+  deleteInventoryFeature,
+  fetchInventoryFeatures,
+  updateInventoryFeature,
+} from '../utils/inventoryVehicles'
 
 const emptyBrand = { name: '', is_active: true }
 const emptyModel = { brand: '', vehicle_type: '', name: '', is_active: true }
+const emptyFeature = { name: '', is_active: true }
 
 export default function AdminConfiguration() {
   const { theme } = useTenantBranding()
@@ -138,6 +145,109 @@ export default function AdminConfiguration() {
       setBrandDelete(null)
       await loadBrands(brandPage)
       await loadAllBrands()
+    } catch (err) {
+      if (err.message === 'SESSION_EXPIRED') {
+        globalThis.location.href = '/admin'
+        return
+      }
+      showToast('error', err.message || 'Delete failed.')
+    }
+  }
+
+  /* Key Features (Portfolio) */
+  const [featuresData, setFeaturesData] = useState({ count: 0, next: null, previous: null, results: [] })
+  const [featurePage, setFeaturePage] = useState(1)
+  const [featureSearch, setFeatureSearch] = useState('')
+  const [featureLoading, setFeatureLoading] = useState(true)
+  const [featureError, setFeatureError] = useState('')
+  const [featureModal, setFeatureModal] = useState(null)
+  const [featureModalError, setFeatureModalError] = useState('')
+  const [featureForm, setFeatureForm] = useState(emptyFeature)
+  const [featureSaving, setFeatureSaving] = useState(false)
+  const [featureDelete, setFeatureDelete] = useState(null)
+
+  const loadFeatures = useCallback(async (page = 1) => {
+    setFeatureLoading(true)
+    setFeatureError('')
+    try {
+      const data = await fetchInventoryFeatures({ page, pageSize: 10 })
+      setFeaturesData(data)
+      setFeaturePage(page)
+    } catch (e) {
+      if (e.message === 'SESSION_EXPIRED') {
+        globalThis.location.href = '/admin'
+        return
+      }
+      setFeatureError(e.message)
+    } finally {
+      setFeatureLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (tab === 'features') loadFeatures(1)
+  }, [tab, loadFeatures])
+
+  const filteredFeatures = useMemo(() => {
+    const q = featureSearch.trim().toLowerCase()
+    const rows = featuresData.results || []
+    if (!q) return rows
+    return rows.filter((f) => f.name?.toLowerCase().includes(q))
+  }, [featuresData.results, featureSearch])
+
+  const openFeatureCreate = () => {
+    setFeatureModalError('')
+    setFeatureForm(emptyFeature)
+    setFeatureModal('create')
+  }
+  const openFeatureEdit = (f) => {
+    setFeatureModalError('')
+    setFeatureForm({ name: f.name || '', is_active: Boolean(f.is_active) })
+    setFeatureModal({ type: 'edit', id: f.id })
+  }
+  const closeFeatureModal = () => {
+    setFeatureModalError('')
+    setFeatureModal(null)
+  }
+
+  const saveFeature = async (e) => {
+    e.preventDefault()
+    setFeatureModalError('')
+    const name = featureForm.name.trim()
+    if (!name) {
+      setFeatureModalError('Name is required.')
+      return
+    }
+    setFeatureSaving(true)
+    try {
+      const payload = { name, is_active: featureForm.is_active }
+      if (featureModal === 'create') {
+        await createInventoryFeature(payload)
+        showToast('success', 'Key feature created.')
+      } else if (featureModal?.type === 'edit') {
+        await updateInventoryFeature(featureModal.id, payload)
+        showToast('success', 'Key feature updated.')
+      }
+      closeFeatureModal()
+      await loadFeatures(featurePage)
+    } catch (err) {
+      if (err.message === 'SESSION_EXPIRED') {
+        globalThis.location.href = '/admin'
+        return
+      }
+      setFeatureModalError(err.message || 'Save failed.')
+    } finally {
+      setFeatureSaving(false)
+    }
+  }
+
+  const confirmDeleteFeature = async () => {
+    if (!featureDelete?.id) return
+    try {
+      await deleteInventoryFeature(featureDelete.id)
+      showToast('success', 'Key feature deleted.')
+      setFeatureDelete(null)
+      await loadFeatures(featurePage)
     } catch (err) {
       if (err.message === 'SESSION_EXPIRED') {
         globalThis.location.href = '/admin'
@@ -340,13 +450,14 @@ export default function AdminConfiguration() {
         <div className="mx-auto max-w-[1180px] space-y-5">
           <div>
             <h2 className="text-3xl font-bold text-slate-900 dark:text-white">Configuration</h2>
-            <p className="mt-1 text-slate-500 dark:text-slate-400">Manage vehicle brands, models, and invoice settings for your workshop.</p>
+            <p className="mt-1 text-slate-500 dark:text-slate-400">Manage vehicle brands, models, key features, and invoice settings for your workshop.</p>
           </div>
 
           <div className="flex flex-wrap gap-2 rounded-2xl border border-slate-200 bg-white p-2 shadow-sm backdrop-blur-sm dark:border-slate-800/60 dark:bg-slate-900/40">
             {[
               ['brands', 'Brands'],
               ['models', 'Models'],
+              ['features', 'Key Features'],
               ['invoice', 'Invoice Settings'],
             ].map(([id, label]) => (
               <button
@@ -585,6 +696,90 @@ export default function AdminConfiguration() {
                       type="button"
                       disabled={!modelsData.next}
                       onClick={() => loadModels(modelPage + 1)}
+                      className="rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-1.5 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-40"
+                    >
+                      Next
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : tab === 'features' ? (
+            <div className="space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="relative min-w-[220px] flex-1 max-w-md">
+                  <Search size={17} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500" />
+                  <input
+                    value={featureSearch}
+                    onChange={(e) => setFeatureSearch(e.target.value)}
+                    placeholder="Search key features by name..."
+                    className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-10 pr-3 text-sm text-slate-800 outline-none transition focus:border-slate-400 dark:border-slate-800 dark:bg-slate-950/50 dark:text-slate-100 dark:placeholder:text-slate-600 dark:focus:border-slate-700"
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={openFeatureCreate}
+                  className="inline-flex items-center gap-2 rounded-xl px-5 py-3 text-sm font-semibold text-white shadow"
+                  style={{ backgroundColor: theme.accent }}
+                >
+                  <Plus size={18} /> Add feature
+                </button>
+              </div>
+              {featureError ? <div className="rounded-xl border border-rose-200 dark:border-rose-900/50 bg-rose-50 dark:bg-rose-900/20 px-4 py-3 text-sm text-rose-800 dark:text-rose-400">{featureError}</div> : null}
+              <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm backdrop-blur-sm dark:border-slate-800/60 dark:bg-slate-900/40">
+                <div className="overflow-x-auto">
+                  <table className="min-w-full">
+                    <thead className="bg-slate-50 dark:bg-slate-800/50 text-left text-xs font-bold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">
+                      <tr>
+                        <th className="px-6 py-4">Name</th>
+                        <th className="px-6 py-4 w-40">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-sm">
+                      {featureLoading ? (
+                        <tr>
+                          <td colSpan={2} className="px-6 py-8 text-slate-500 dark:text-slate-400">Loading…</td>
+                        </tr>
+                      ) : filteredFeatures.length === 0 ? (
+                        <tr>
+                          <td colSpan={2} className="px-6 py-8 text-slate-500 dark:text-slate-400">No key features found.</td>
+                        </tr>
+                      ) : (
+                        filteredFeatures.map((f) => (
+                          <tr key={f.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40">
+                            <td className="px-6 py-3 font-medium text-slate-900 dark:text-white">{f.name}</td>
+                            <td className="px-6 py-3">
+                              <div className="flex gap-1 text-slate-500 dark:text-slate-400">
+                                <button type="button" className="rounded-lg p-2 hover:bg-slate-100 dark:hover:bg-slate-800" title="Edit" onClick={() => openFeatureEdit(f)}>
+                                  <Pencil size={16} />
+                                </button>
+                                <button type="button" className="rounded-lg p-2 hover:bg-rose-50 dark:hover:bg-rose-900/20 text-rose-600" title="Delete" onClick={() => setFeatureDelete(f)}>
+                                  <Trash2 size={16} />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="flex items-center justify-between border-t border-slate-200 dark:border-slate-800 px-6 py-4 text-sm text-slate-500 dark:text-slate-400">
+                  <p>Showing {filteredFeatures.length} of {featuresData.count} features</p>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      disabled={!featuresData.previous}
+                      onClick={() => loadFeatures(featurePage - 1)}
+                      className="rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-1.5 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-40"
+                    >
+                      Prev
+                    </button>
+                    <span className="rounded-lg px-3 py-1.5 text-white" style={{ backgroundColor: theme.accent }}>{featurePage}</span>
+                    <button
+                      type="button"
+                      disabled={!featuresData.next}
+                      onClick={() => loadFeatures(featurePage + 1)}
                       className="rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-1.5 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-40"
                     >
                       Next
@@ -835,6 +1030,70 @@ export default function AdminConfiguration() {
                 Cancel
               </button>
               <button type="button" className="rounded-xl bg-rose-600 px-4 py-2 text-sm font-semibold text-white" onClick={confirmDeleteModel}>
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {/* Feature modal */}
+      {featureModal ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl dark:border-slate-800/60 dark:bg-slate-950">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-bold text-slate-900 dark:text-white">{featureModal === 'create' ? 'New key feature' : 'Edit key feature'}</h3>
+              <button type="button" className="rounded-lg p-2 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800" onClick={closeFeatureModal}>
+                <X size={18} />
+              </button>
+            </div>
+            <form onSubmit={saveFeature} className="mt-4 space-y-4">
+              {featureModalError ? (
+                <div className="rounded-xl border border-rose-300 dark:border-rose-800 bg-rose-50 dark:bg-rose-900/20 px-3 py-2 text-sm text-rose-700 dark:text-rose-400">{featureModalError}</div>
+              ) : null}
+              <div>
+                <label className="mb-1 block text-xs font-semibold text-slate-500 dark:text-slate-400">Name</label>
+                <input
+                  value={featureForm.name}
+                  onChange={(e) => {
+                    setFeatureModalError('')
+                    setFeatureForm((p) => ({ ...p, name: e.target.value }))
+                  }}
+                  className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 px-3 py-2.5 text-sm outline-none focus:border-slate-400 dark:focus:border-slate-600 placeholder:text-slate-400 dark:placeholder:text-slate-600"
+                  placeholder="e.g. Sunroof"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <button type="button" className="rounded-xl px-4 py-2 text-sm font-semibold text-slate-600 dark:text-slate-400" onClick={closeFeatureModal}>
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={featureSaving}
+                  className="rounded-xl px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+                  style={{ backgroundColor: theme.accent }}
+                >
+                  {featureSaving ? 'Saving…' : featureModal === 'create' ? 'Save' : 'Update'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      ) : null}
+
+      {featureDelete ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 p-6 shadow-2xl">
+            <h3 className="text-lg font-bold text-slate-900 dark:text-white">Delete key feature</h3>
+            <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
+              Delete <span className="font-semibold">{featureDelete.name}</span>?
+            </p>
+            <div className="mt-5 flex justify-end gap-2">
+              <button type="button" className="rounded-xl px-4 py-2 text-sm font-semibold text-slate-600 dark:text-slate-400" onClick={() => setFeatureDelete(null)}>
+                Cancel
+              </button>
+              <button type="button" className="rounded-xl bg-rose-600 px-4 py-2 text-sm font-semibold text-white" onClick={confirmDeleteFeature}>
                 Delete
               </button>
             </div>

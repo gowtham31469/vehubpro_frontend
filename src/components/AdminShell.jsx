@@ -169,10 +169,7 @@ function SidebarLink({ to, label, icon: Icon, accent, collapsed }) {
 }
 
 // ── Submodule child link ──────────────────────────────────────────────────────
-function SidebarSubLink({ to, label, accent }) {
-  const { pathname } = useLocation()
-  const active = pathname === to || pathname.startsWith(to + '/')
-
+function SidebarSubLink({ to, label, accent, active }) {
   return (
     <Link
       to={to}
@@ -195,7 +192,16 @@ function SidebarSubLink({ to, label, accent }) {
 function SidebarAccordion({ moduleKey, label, icon: Icon, accent, collapsed, submodules }) {
   const { pathname } = useLocation()
   const childRoutes = submodules.map((s) => resolveSubmoduleRoute(moduleKey, s.key, s.name))
-  const isParentActive = childRoutes.some((r) => pathname === r || pathname.startsWith(r + '/'))
+
+  // Longest-match-wins: when one submodule's route is a prefix of another's
+  // (e.g. Insights → /admin/portfolio, Inventory Vehicles → /admin/portfolio/inventory),
+  // only the most specific match should be highlighted, not every ancestor prefix.
+  const activeRoute = childRoutes.reduce((best, r) => {
+    const matches = pathname === r || pathname.startsWith(r + '/')
+    if (!matches) return best
+    return !best || r.length > best.length ? r : best
+  }, null)
+  const isParentActive = activeRoute !== null
   const [open, setOpen] = useState(isParentActive)
 
   useEffect(() => {
@@ -245,14 +251,18 @@ function SidebarAccordion({ moduleKey, label, icon: Icon, accent, collapsed, sub
         style={{ maxHeight: open ? `${submodules.length * 44}px` : '0px' }}
       >
         <div className="mt-0.5 ml-3 space-y-0.5 border-l border-slate-200 pb-1 pl-3 dark:border-slate-700/60">
-          {submodules.map((sub) => (
-            <SidebarSubLink
-              key={sub.key}
-              to={resolveSubmoduleRoute(moduleKey, sub.key, sub.name)}
-              label={sub.name}
-              accent={accent}
-            />
-          ))}
+          {submodules.map((sub) => {
+            const subRoute = resolveSubmoduleRoute(moduleKey, sub.key, sub.name)
+            return (
+              <SidebarSubLink
+                key={sub.key}
+                to={subRoute}
+                label={sub.name}
+                accent={accent}
+                active={subRoute === activeRoute}
+              />
+            )
+          })}
         </div>
       </div>
     </div>
