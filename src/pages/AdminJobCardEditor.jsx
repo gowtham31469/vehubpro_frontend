@@ -525,8 +525,11 @@ export default function AdminJobCardEditor() {
     )
   }
 
+  // Customers, vehicles, and service items all populate searchable dropdowns
+  // here (filtered client-side), so they're fetched in full rather than
+  // paginated — a numeric page_size would silently hide records beyond it.
   useEffect(() => {
-    fetchCustomers({ page: 1, pageSize: 200 })
+    fetchCustomers({ pageSize: 'all' })
       .then((d) => setCustomers(d.results || []))
       .catch(() => setCustomers([]))
   }, [])
@@ -534,13 +537,13 @@ export default function AdminJobCardEditor() {
   // Vehicles are loaded once, tenant-wide, so a vehicle can be searched and
   // picked first — selecting one then auto-selects its owning customer.
   useEffect(() => {
-    fetchServiceVehicles({ page: 1, pageSize: 100 })
+    fetchServiceVehicles({ pageSize: 'all' })
       .then((d) => setVehicles(d.results || []))
       .catch(() => setVehicles([]))
   }, [])
 
   useEffect(() => {
-    fetchServiceItems({ page: 1, pageSize: 500, isActive: true })
+    fetchServiceItems({ pageSize: 'all', isActive: true })
       .then((d) => setServiceItems(d.results || []))
       .catch(() => setServiceItems([]))
   }, [])

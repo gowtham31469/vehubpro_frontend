@@ -37,6 +37,14 @@ export async function recordPayment(id, payload) {
   )
 }
 
+export async function cancelInvoice(id, payload = {}) {
+  return parseResponse(
+    `/api/v1/invoices/${id}/cancel/`,
+    { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) },
+    'Failed to cancel invoice.',
+  )
+}
+
 export async function generateInvoiceFromJobCard(jobCardId, payload = {}) {
   return parseResponse(
     `/api/v1/job-cards/${jobCardId}/generate-invoice/`,

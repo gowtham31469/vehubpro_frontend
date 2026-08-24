@@ -188,9 +188,15 @@ export default function AdminInvoices() {
                       <td className="px-5 py-3 text-right text-emerald-700 dark:text-emerald-500">{fmtMoney(row.amount_paid)}</td>
                       <td className="px-5 py-3 text-right font-semibold text-rose-700 dark:text-rose-500">{fmtMoney(row.balance_due)}</td>
                       <td className="px-5 py-3">
-                        <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-bold ${paymentBadgeStyle(row.payment_status)}`}>
-                          {paymentLabel(row.payment_status)}
-                        </span>
+                        {row.is_cancelled ? (
+                          <span className="inline-flex rounded-full bg-slate-200 px-2.5 py-0.5 text-xs font-bold text-slate-600 dark:bg-slate-700 dark:text-slate-300">
+                            Cancelled
+                          </span>
+                        ) : (
+                          <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-bold ${paymentBadgeStyle(row.payment_status)}`}>
+                            {paymentLabel(row.payment_status)}
+                          </span>
+                        )}
                       </td>
                       <td className="px-5 py-3 text-slate-500 dark:text-slate-400">{formatDate(row.created_at)}</td>
                       <td className="px-5 py-3">
