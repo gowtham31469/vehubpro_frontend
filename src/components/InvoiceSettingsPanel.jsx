@@ -30,6 +30,25 @@ function Field({ children, hint }) {
   )
 }
 
+function ToggleSwitch({ theme, checked, disabled, onClick, onLabel, offLabel }) {
+  return (
+    <label className="flex shrink-0 cursor-pointer items-center gap-2 text-xs font-semibold text-slate-500 dark:text-slate-400">
+      {checked ? onLabel : offLabel}
+      <button
+        type="button"
+        role="switch"
+        aria-checked={checked}
+        disabled={disabled}
+        onClick={onClick}
+        className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition disabled:opacity-60 ${checked ? '' : 'bg-slate-300 dark:bg-slate-700'}`}
+        style={checked ? { backgroundColor: theme.accent } : undefined}
+      >
+        <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition ${checked ? 'translate-x-6' : 'translate-x-1'}`} />
+      </button>
+    </label>
+  )
+}
+
 function Dropdown({ open, setOpen, dropdownRef, displayValue, placeholder, children }) {
   return (
     <div className="relative" ref={dropdownRef}>
@@ -72,7 +91,7 @@ export default function InvoiceSettingsPanel() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [qrFile, setQrFile] = useState(null)
-  const [togglingTerms, setTogglingTerms] = useState(false)
+  const [togglingField, setTogglingField] = useState(null)
   const fileInputRef = useRef(null)
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }))
 
@@ -131,24 +150,24 @@ export default function InvoiceSettingsPanel() {
     }
   }
 
-  // Unlike the rest of the form, this toggle saves immediately on click —
+  // Unlike the rest of the form, these toggles save immediately on click —
   // matching how a switch is expected to behave, rather than staging a
   // change that silently reverts if the user never scrolls down to Save.
-  const toggleShowTerms = async () => {
-    const next = !form.show_terms_and_conditions
-    setForm((f) => ({ ...f, show_terms_and_conditions: next }))
-    setTogglingTerms(true)
+  const toggleBooleanSetting = async (field, { onMessage, offMessage }) => {
+    const next = !form[field]
+    setForm((f) => ({ ...f, [field]: next }))
+    setTogglingField(field)
     try {
       const fd = new FormData()
-      fd.append('show_terms_and_conditions', next)
+      fd.append(field, next)
       const updated = await updateMyInvoiceSettings(fd)
       setSettings(updated)
-      showToast('success', next ? 'Terms & Conditions will show on invoice PDFs.' : 'Terms & Conditions hidden from invoice PDFs.')
+      showToast('success', next ? onMessage : offMessage)
     } catch (e) {
-      setForm((f) => ({ ...f, show_terms_and_conditions: !next }))
+      setForm((f) => ({ ...f, [field]: !next }))
       showToast('error', e.message || 'Failed to update this setting.')
     } finally {
-      setTogglingTerms(false)
+      setTogglingField(null)
     }
   }
 
@@ -274,22 +293,17 @@ export default function InvoiceSettingsPanel() {
             <h3 className="text-base font-bold text-slate-900 dark:text-white">Terms & Conditions Variables</h3>
             <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">Used to fill in placeholders inside your terms & conditions text below.</p>
           </div>
-          <label className="flex shrink-0 cursor-pointer items-center gap-2 text-xs font-semibold text-slate-500 dark:text-slate-400">
-            {form.show_terms_and_conditions ? 'Shown on invoice PDFs' : 'Hidden on invoice PDFs'}
-            <button
-              type="button"
-              role="switch"
-              aria-checked={form.show_terms_and_conditions}
-              disabled={togglingTerms}
-              onClick={toggleShowTerms}
-              className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition disabled:opacity-60 ${form.show_terms_and_conditions ? '' : 'bg-slate-300 dark:bg-slate-700'}`}
-              style={form.show_terms_and_conditions ? { backgroundColor: theme.accent } : undefined}
-            >
-              <span
-                className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition ${form.show_terms_and_conditions ? 'translate-x-6' : 'translate-x-1'}`}
-              />
-            </button>
-          </label>
+          <ToggleSwitch
+            theme={theme}
+            checked={form.show_terms_and_conditions}
+            disabled={togglingField === 'show_terms_and_conditions'}
+            onClick={() => toggleBooleanSetting('show_terms_and_conditions', {
+              onMessage: 'Terms & Conditions will show on invoice PDFs.',
+              offMessage: 'Terms & Conditions hidden from invoice PDFs.',
+            })}
+            onLabel="Shown on invoice PDFs"
+            offLabel="Hidden on invoice PDFs"
+          />
         </div>
 
         <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">

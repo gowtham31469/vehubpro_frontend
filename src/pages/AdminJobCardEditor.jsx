@@ -325,6 +325,10 @@ function computePreview(form, serviceItems = []) {
     })
 
   const total = Math.round((taxable + cgst + sgst + shop) * 100) / 100
+  // Round to the nearest whole rupee — matches the backend's round_off_amount,
+  // which is what actually gets stored/shown on the PDF once the job card is saved.
+  const roundedTotal = Math.round(total)
+  const roundOff = Math.round((roundedTotal - total) * 100) / 100
 
   return {
     sub,
@@ -335,6 +339,8 @@ function computePreview(form, serviceItems = []) {
     taxTotal,
     shop,
     total,
+    roundOff,
+    roundedTotal,
     taxByKey,
     filteredRows,
     gstLabels,
@@ -363,6 +369,81 @@ function removeRecentId(id) {
   sessionStorage.setItem(RECENT_KEY, JSON.stringify(cur))
 }
 
+const INVOICE_TYPE_OPTIONS = [
+  { value: 'gst', label: 'With GST', hint: 'Adds CGST + SGST on top of the base price.' },
+  { value: 'non_gst', label: 'Without GST', hint: 'No tax added — customer pays the base price only.' },
+]
+
+// The GST/Non-GST choice is decided once here, at generation time — it's stored
+// on the invoice and can't be changed afterward (a fresh invoice number is
+// allocated per type, from independent sequences).
+function GenerateInvoiceModal({ jobCardId, theme, showToast, onClose, onSuccess }) {
+  const [invoiceType, setInvoiceType] = useState('gst')
+  const [generating, setGenerating] = useState(false)
+
+  const handleConfirm = async () => {
+    setGenerating(true)
+    try {
+      const invoice = await generateInvoiceFromJobCard(jobCardId, { invoice_type: invoiceType })
+      onSuccess(invoice)
+    } catch (e) {
+      if (e.message === 'SESSION_EXPIRED') { globalThis.location.href = '/admin'; return }
+      showToast('error', e.message || 'Failed to generate invoice.')
+    } finally {
+      setGenerating(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm">
+      <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl dark:border-slate-800 dark:bg-slate-950">
+        <div className="flex items-center justify-between gap-3">
+          <h3 className="text-lg font-bold text-slate-900 dark:text-white">Generate Invoice</h3>
+          <button type="button" onClick={onClose} aria-label="Close" className="text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200">
+            <X size={18} />
+          </button>
+        </div>
+        <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
+          Choose the invoice type. This can't be changed after generation.
+        </p>
+        <div className="mt-4 space-y-2">
+          {INVOICE_TYPE_OPTIONS.map((opt) => {
+            const selected = invoiceType === opt.value
+            return (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => setInvoiceType(opt.value)}
+                className="w-full rounded-xl border p-3 text-left transition"
+                style={selected ? { borderColor: theme.accent, backgroundColor: theme.accentSoft } : { borderColor: 'rgb(226 232 240)' }}
+              >
+                <p className="text-sm font-semibold" style={{ color: selected ? theme.accent : undefined }}>
+                  <span className={selected ? '' : 'text-slate-800 dark:text-slate-200'}>{opt.label}</span>
+                </p>
+                <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{opt.hint}</p>
+              </button>
+            )
+          })}
+        </div>
+        <div className="mt-5 flex justify-end gap-2">
+          <button type="button" onClick={onClose} disabled={generating} className="rounded-xl px-4 py-2 text-sm font-semibold text-slate-600 disabled:opacity-60 dark:text-slate-400">
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={handleConfirm}
+            disabled={generating}
+            className="inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-60"
+            style={{ backgroundColor: theme.accent }}
+          >
+            {generating ? 'Generating…' : 'Generate Invoice'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function AdminJobCardEditor() {
   const { id: routeId } = useParams()
   const navigate = useNavigate()
@@ -372,7 +453,7 @@ export default function AdminJobCardEditor() {
 
   const [loading, setLoading] = useState(!isNew)
   const [saving, setSaving] = useState(false)
-  const [generatingInvoice, setGeneratingInvoice] = useState(false)
+  const [generateInvoiceOpen, setGenerateInvoiceOpen] = useState(false)
   const [generatingPdf, setGeneratingPdf] = useState(false)
   const [markingDelivered, setMarkingDelivered] = useState(false)
   const [error, setError] = useState('')
@@ -810,6 +891,7 @@ export default function AdminJobCardEditor() {
   }
 
   return (
+    <>
       <AdminShell activeNav="job-cards">
         <div className="mx-auto max-w-6xl px-3 py-4 md:px-4">
           {/* Compliance strip — DPDP / GDPR awareness */}
@@ -962,38 +1044,13 @@ export default function AdminJobCardEditor() {
               {form.status === 'completed' && (
                 <button
                   type="button"
-                  disabled={isNew || generatingInvoice}
-                  onClick={async () => {
-                    if (!routeId) return
-                    setGeneratingInvoice(true)
-                    try {
-                      const invoice = await generateInvoiceFromJobCard(routeId)
-                      showToast('success', `Invoice ${invoice.invoice_number} generated.`)
-                      navigate(`/admin/invoices/${invoice.id}`)
-                    } catch (e) {
-                      if (e.message === 'SESSION_EXPIRED') { globalThis.location.href = '/admin'; return }
-                      showToast('error', e.message || 'Failed to generate invoice.')
-                    } finally {
-                      setGeneratingInvoice(false)
-                    }
-                  }}
+                  disabled={isNew}
+                  onClick={() => setGenerateInvoiceOpen(true)}
                   className="inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-white shadow-md transition hover:opacity-90 disabled:opacity-50"
                   style={{ backgroundColor: theme.accent }}
                 >
-                  {generatingInvoice ? (
-                    <>
-                      <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
-                      </svg>
-                      Generating…
-                    </>
-                  ) : (
-                    <>
-                      <FileText size={16} />
-                      Generate invoice
-                    </>
-                  )}
+                  <FileText size={16} />
+                  Generate invoice
                 </button>
               )}
 
@@ -1532,15 +1589,79 @@ export default function AdminJobCardEditor() {
             <aside className="space-y-4 lg:sticky lg:top-6 lg:col-span-1 lg:self-start">
               <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-[0_1px_3px_rgba(15,23,42,0.06)] backdrop-blur-sm dark:border-slate-800/60 dark:bg-slate-900/40">
                 <h2 className="text-base font-bold text-slate-900 dark:text-white">Financial summary</h2>
+
+                {/* Adjustments — the only two user-editable inputs on this panel,
+                    grouped up front so it's clear what drives the breakdown below. */}
+                <div className="mt-4 space-y-3 rounded-xl border border-slate-100 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-900/40">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">Adjustments</p>
+                  <div className="flex items-center justify-between gap-2">
+                    <label htmlFor="header-shop-fees" className="text-sm text-slate-600 dark:text-slate-300">Shop fees (₹)</label>
+                    <input
+                      id="header-shop-fees"
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={form.shop_fees}
+                      readOnly={isLocked}
+                      onChange={(e) => !isLocked && setForm((p) => ({ ...p, shop_fees: e.target.value }))}
+                      className="w-28 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-right text-sm tabular-nums outline-none focus:border-slate-300 dark:border-slate-800 dark:bg-slate-900 dark:text-white dark:focus:border-slate-700 disabled:opacity-50"
+                      disabled={isLocked}
+                    />
+                  </div>
+                  {couponOpen ? (
+                    <div className="flex items-center justify-between gap-2">
+                      <label htmlFor="header-discount" className="text-sm text-slate-600 dark:text-slate-300">Discount (₹)</label>
+                      <div className="flex items-center gap-2">
+                        <input
+                          id="header-discount"
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          autoFocus
+                          value={form.discount_amount}
+                          readOnly={isLocked}
+                          onChange={(e) => !isLocked && setForm((p) => ({ ...p, discount_amount: e.target.value }))}
+                          className="w-28 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-right text-sm tabular-nums outline-none focus:border-slate-300 dark:border-slate-800 dark:bg-slate-900 dark:text-white dark:focus:border-slate-700 disabled:opacity-50"
+                          disabled={isLocked}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (isLocked) return
+                            setForm((p) => ({ ...p, discount_amount: '0' }))
+                            setCouponOpen(false)
+                          }}
+                          disabled={isLocked}
+                          className="shrink-0 text-xs font-semibold text-rose-600 hover:text-rose-700 disabled:opacity-50 dark:text-rose-500"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => !isLocked && setCouponOpen(true)}
+                      disabled={isLocked}
+                      className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:opacity-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
+                    >
+                      Apply Coupon / Discount
+                    </button>
+                  )}
+                </div>
+
+                {/* Read-only breakdown, flowing straight into the grand total. */}
                 <dl className="mt-4 space-y-3 text-sm">
                   <div className="flex justify-between gap-2">
                     <dt className="text-slate-500 dark:text-slate-400">Subtotal</dt>
                     <dd className="font-bold tabular-nums text-slate-900 dark:text-slate-100">{fmtMoney(preview.sub)}</dd>
                   </div>
-                  <div className="flex justify-between gap-2">
-                    <dt className="text-slate-500 dark:text-slate-400">Discount</dt>
-                    <dd className="font-bold tabular-nums text-rose-600 dark:text-rose-500">−{fmtMoney(preview.discount)}</dd>
-                  </div>
+                  {preview.discount > 0 && (
+                    <div className="flex justify-between gap-2">
+                      <dt className="text-slate-500 dark:text-slate-400">Discount</dt>
+                      <dd className="font-bold tabular-nums text-rose-600 dark:text-rose-500">−{fmtMoney(preview.discount)}</dd>
+                    </div>
+                  )}
                   <div className="flex justify-between gap-2">
                     <dt className="text-slate-500 dark:text-slate-400">Taxable</dt>
                     <dd className="font-bold tabular-nums text-slate-900 dark:text-slate-100">{fmtMoney(preview.taxable)}</dd>
@@ -1569,65 +1690,28 @@ export default function AdminJobCardEditor() {
                     </dt>
                     <dd className="font-medium tabular-nums">{fmtMoney(preview.taxTotal)}</dd>
                   </div>
-                </dl>
-                <dl className="mt-3 space-y-3 border-t border-slate-100 pt-3 text-sm dark:border-slate-800">
-                  <div className="flex justify-between gap-2">
-                    <dt className="text-slate-500 dark:text-slate-400">Shop fees</dt>
-                    <dd className="w-28">
-                      <input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        value={form.shop_fees}
-                        readOnly={isLocked}
-                        onChange={(e) => !isLocked && setForm((p) => ({ ...p, shop_fees: e.target.value }))}
-                        className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-right text-sm tabular-nums outline-none focus:border-slate-300 dark:border-slate-800 dark:bg-slate-900 dark:text-white dark:focus:border-slate-700 disabled:opacity-50"
-                        disabled={isLocked}
-                      />
-                    </dd>
-                  </div>
-                </dl>
-                <div className="mt-3 border-t border-slate-100 pt-3 dark:border-slate-800">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (isLocked) return
-                      if (couponOpen) {
-                        setForm((p) => ({ ...p, discount_amount: '0' }))
-                      }
-                      setCouponOpen((o) => !o)
-                    }}
-                    disabled={isLocked}
-                    className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:opacity-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
-                  >
-                    {couponOpen ? 'Remove Discount' : 'Apply Coupon / Discount'}
-                  </button>
-                  {couponOpen && (
-                    <div className="mt-3 flex items-center gap-2">
-                      <label htmlFor="header-discount" className="shrink-0 text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                        Discount (₹)
-                      </label>
-                      <input
-                        id="header-discount"
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        autoFocus
-                        value={form.discount_amount}
-                        readOnly={isLocked}
-                        onChange={(e) => !isLocked && setForm((p) => ({ ...p, discount_amount: e.target.value }))}
-                        className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-right text-sm tabular-nums outline-none focus:border-slate-300 dark:border-slate-800 dark:bg-slate-900 dark:text-white dark:focus:border-slate-700 disabled:opacity-50"
-                        disabled={isLocked}
-                      />
+                  {preview.shop > 0 && (
+                    <div className="flex justify-between gap-2">
+                      <dt className="text-slate-500 dark:text-slate-400">Shop fees</dt>
+                      <dd className="tabular-nums text-slate-700 dark:text-slate-300">{fmtMoney(preview.shop)}</dd>
                     </div>
                   )}
-                </div>
+                  {preview.roundOff !== 0 && (
+                    <div className="flex justify-between gap-2 border-t border-slate-100 pt-3 text-slate-600 dark:border-slate-800 dark:text-slate-300">
+                      <dt className="text-slate-500 dark:text-slate-400">Round off</dt>
+                      <dd className="tabular-nums text-slate-700 dark:text-slate-300">
+                        {preview.roundOff > 0 ? '+' : '−'}
+                        {fmtMoney(Math.abs(preview.roundOff))}
+                      </dd>
+                    </div>
+                  )}
+                </dl>
                 <div
                   className="mt-5 rounded-2xl px-4 py-5 text-center text-white shadow-xl"
                   style={{ background: `linear-gradient(135deg, ${theme.accent} 0%, #0f172a 100%)` }}
                 >
                   <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/70">Grand total</p>
-                  <p className="mt-2 text-3xl font-black tabular-nums tracking-tight">{fmtMoney(preview.total)}</p>
+                  <p className="mt-2 text-3xl font-black tabular-nums tracking-tight">{fmtMoney(preview.roundedTotal)}</p>
                   <p className="mt-2 text-[10px] text-white/50 italic">Calculated preview</p>
                 </div>
                 <p className="mt-3 text-[10px] leading-relaxed text-slate-400 dark:text-slate-500">
@@ -1709,5 +1793,20 @@ export default function AdminJobCardEditor() {
           </div>
         )}
       </AdminShell>
+
+      {generateInvoiceOpen && (
+        <GenerateInvoiceModal
+          jobCardId={routeId}
+          theme={theme}
+          showToast={showToast}
+          onClose={() => setGenerateInvoiceOpen(false)}
+          onSuccess={(invoice) => {
+            setGenerateInvoiceOpen(false)
+            showToast('success', `Invoice ${invoice.invoice_number} generated.`)
+            navigate(`/admin/invoices/${invoice.id}`)
+          }}
+        />
+      )}
+    </>
   )
 }

@@ -320,7 +320,12 @@ export default function AdminInvoiceDetail() {
                   <ArrowLeft size={16} />
                 </button>
                 <div>
-                  <h1 className="text-xl font-bold text-slate-900 dark:text-white">Invoice Preview</h1>
+                  <div className="flex items-center gap-2">
+                    <h1 className="text-xl font-bold text-slate-900 dark:text-white">Invoice Preview</h1>
+                    <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-bold ${invoice.invoice_type === 'gst' ? 'bg-sky-100 text-sky-800 dark:bg-sky-900/30 dark:text-sky-400' : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300'}`}>
+                      {invoice.invoice_type === 'gst' ? 'GST' : 'Non-GST'}
+                    </span>
+                  </div>
                   <p className="text-xs text-slate-500 dark:text-slate-400">#{invoice.invoice_number}</p>
                 </div>
               </div>

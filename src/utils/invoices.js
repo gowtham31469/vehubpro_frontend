@@ -8,9 +8,11 @@ async function parseResponse(path, options, fallbackError) {
   return unwrapData(payload)
 }
 
-export async function fetchInvoices({ page = 1, pageSize = 10, paymentStatus = '', fyCode = '', search = '' } = {}) {
+export async function fetchInvoices({ page = 1, pageSize = 10, paymentStatus = '', invoiceType = '', isCancelled, fyCode = '', search = '' } = {}) {
   const params = new URLSearchParams({ page: String(page), page_size: String(pageSize) })
   if (paymentStatus) params.set('payment_status', paymentStatus)
+  if (invoiceType) params.set('invoice_type', invoiceType)
+  if (isCancelled !== undefined) params.set('is_cancelled', String(isCancelled))
   if (fyCode) params.set('fy_code', fyCode)
   if (search.trim()) params.set('search', search.trim())
   return parseResponse(`/api/v1/invoices/?${params.toString()}`, { method: 'GET' }, 'Failed to fetch invoices.')

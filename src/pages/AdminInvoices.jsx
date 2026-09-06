@@ -10,6 +10,13 @@ const PAYMENT_TABS = [
   { id: 'unpaid', label: 'Unpaid' },
   { id: 'partial', label: 'Partial' },
   { id: 'paid', label: 'Paid' },
+  { id: 'cancelled', label: 'Cancelled' },
+]
+
+const TYPE_TABS = [
+  { id: '', label: 'All' },
+  { id: 'gst', label: 'GST' },
+  { id: 'non_gst', label: 'Non-GST' },
 ]
 
 function paymentBadgeStyle(status) {
@@ -42,6 +49,7 @@ export default function AdminInvoices() {
   const navigate = useNavigate()
   const { theme } = useTenantBranding()
   const [paymentTab, setPaymentTab] = useState('')
+  const [typeTab, setTypeTab] = useState('')
   const [search, setSearch] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [listData, setListData] = useState({ count: 0, next: null, previous: null, results: [] })
@@ -59,7 +67,19 @@ export default function AdminInvoices() {
     setLoading(true)
     setListError('')
     try {
-      const data = await fetchInvoices({ page: p, pageSize: 10, paymentStatus: paymentTab, search: debouncedSearch })
+      // "Cancelled" is its own tab (a separate is_cancelled flag, not a payment
+      // status) — selecting it shows only cancelled invoices; the other payment
+      // tabs exclude cancelled ones so a voided invoice doesn't linger under
+      // "Unpaid"; "All" shows everything, cancelled included.
+      const isCancelledTab = paymentTab === 'cancelled'
+      const data = await fetchInvoices({
+        page: p,
+        pageSize: 10,
+        paymentStatus: isCancelledTab ? '' : paymentTab,
+        isCancelled: isCancelledTab ? true : (paymentTab ? false : undefined),
+        invoiceType: typeTab,
+        search: debouncedSearch,
+      })
       setListData(data)
       setPage(p)
     } catch (e) {
@@ -68,9 +88,9 @@ export default function AdminInvoices() {
     } finally {
       setLoading(false)
     }
-  }, [paymentTab, debouncedSearch])
+  }, [paymentTab, typeTab, debouncedSearch])
 
-  useEffect(() => { loadList(1) }, [paymentTab, debouncedSearch, loadList])
+  useEffect(() => { loadList(1) }, [paymentTab, typeTab, debouncedSearch, loadList])
 
   // Summary stats derived from list data (lightweight)
   const results = listData.results || []
@@ -113,15 +133,32 @@ export default function AdminInvoices() {
             ))}
           </div>
 
-          {/* Search */}
-          <div className="relative max-w-md">
-            <Search size={17} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500" />
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search invoice number or vehicle plate…"
-              className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-10 pr-3 text-sm text-slate-800 outline-none transition focus:border-slate-400 dark:border-slate-800 dark:bg-slate-950/50 dark:text-slate-100 dark:placeholder:text-slate-600 dark:focus:border-slate-700"
-            />
+          {/* Search + invoice type filter, side by side */}
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="relative max-w-md flex-1">
+              <Search size={17} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500" />
+              <input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search invoice number or vehicle plate…"
+                className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-10 pr-3 text-sm text-slate-800 outline-none transition focus:border-slate-400 dark:border-slate-800 dark:bg-slate-950/50 dark:text-slate-100 dark:placeholder:text-slate-600 dark:focus:border-slate-700"
+              />
+            </div>
+            <div className="flex flex-wrap gap-1 rounded-xl border border-slate-200 bg-white p-1.5 shadow-sm backdrop-blur-sm dark:border-slate-800/60 dark:bg-slate-900/40">
+              {TYPE_TABS.map(({ id, label }) => (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => setTypeTab(id)}
+                  className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+                    typeTab === id ? 'text-white shadow' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
+                  }`}
+                  style={typeTab === id ? { backgroundColor: theme.accent } : undefined}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
           </div>
 
           {/* Error */}
@@ -138,6 +175,7 @@ export default function AdminInvoices() {
                     <th className="px-5 py-4">Invoice no.</th>
                     <th className="px-5 py-4">Vehicle</th>
                     <th className="px-5 py-4">FY</th>
+                    <th className="px-5 py-4">Type</th>
                     <th className="px-5 py-4 text-right">Total</th>
                     <th className="px-5 py-4 text-right">Paid</th>
                     <th className="px-5 py-4 text-right">Balance</th>
@@ -149,11 +187,11 @@ export default function AdminInvoices() {
                 <tbody className="divide-y divide-slate-100 text-sm dark:divide-slate-800/60">
                   {loading ? (
                     <tr>
-                      <td colSpan={9} className="px-5 py-10 text-center text-slate-500 dark:text-slate-400">Loading…</td>
+                      <td colSpan={10} className="px-5 py-10 text-center text-slate-500 dark:text-slate-400">Loading…</td>
                     </tr>
                   ) : results.length === 0 ? (
                     <tr>
-                      <td colSpan={9} className="px-5 py-14 text-center">
+                      <td colSpan={10} className="px-5 py-14 text-center">
                         <p className="font-medium text-slate-600 dark:text-slate-400">No invoices found.</p>
                         <p className="mt-1 text-xs text-slate-400">
                           Invoices are generated from completed job cards.{' '}
@@ -182,6 +220,11 @@ export default function AdminInvoices() {
                       <td className="px-5 py-3 text-slate-600 dark:text-slate-400">
                         <span className="rounded-md bg-slate-100 dark:bg-slate-800 px-2 py-0.5 text-xs font-semibold text-slate-700 dark:text-slate-300">
                           {row.fy_code}
+                        </span>
+                      </td>
+                      <td className="px-5 py-3">
+                        <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-bold ${row.invoice_type === 'gst' ? 'bg-sky-100 text-sky-800 dark:bg-sky-900/30 dark:text-sky-400' : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300'}`}>
+                          {row.invoice_type === 'gst' ? 'GST' : 'Non-GST'}
                         </span>
                       </td>
                       <td className="px-5 py-3 text-right font-medium text-slate-800 dark:text-slate-200">{fmtMoney(row.total_amount)}</td>
