@@ -1,5 +1,5 @@
 import {
-  Briefcase, Car, ChevronDown, ClipboardList, LayoutGrid, LogOut,
+  Briefcase, Car, ChevronDown, ClipboardList, FileText, LayoutGrid, LogOut,
   Monitor, Moon, PanelLeftClose, PanelLeftOpen, ReceiptText,
   Settings2, SlidersHorizontal, Sun, Users,
 } from 'lucide-react'
@@ -19,6 +19,7 @@ const MODULE_META = {
   'service-vehicles':  { icon: Car,               to: '/admin/service-vehicles' },
   'job-cards':         { icon: ClipboardList,     to: '/admin/job-cards' },
   'invoices':          { icon: ReceiptText,       to: '/admin/invoices' },
+  'quotations':        { icon: FileText,          to: '/admin/quotations' },
   'services':          { icon: Settings2,         to: '/admin/services' },
   'configuration':     { icon: SlidersHorizontal, to: '/admin/configuration' },
   'user_management':   { icon: Users,             to: '/admin/users' },
@@ -45,6 +46,11 @@ const SUBMODULE_ROUTE_MAP = {
   'invoices':            '/admin/invoices',
   'invoice-list':        '/admin/invoices',
   'invoice_list':        '/admin/invoices',
+
+  // Quotations
+  'quotations':          '/admin/quotations',
+  'quotation-list':      '/admin/quotations',
+  'quotation_list':      '/admin/quotations',
 
   // Service Vehicles
   'service-vehicles':    '/admin/service-vehicles',
@@ -126,6 +132,7 @@ const FALLBACK_NAV = [
   { key: 'service-vehicles', name: 'Service Vehicles', submodules: [] },
   { key: 'job-cards',        name: 'Job Cards',        submodules: [] },
   { key: 'invoices',         name: 'Invoices',         submodules: [] },
+  { key: 'quotations',       name: 'Quotations',       submodules: [] },
   { key: 'services',         name: 'Services',         submodules: [] },
   { key: 'configuration',    name: 'Configuration',    submodules: [] },
 ]

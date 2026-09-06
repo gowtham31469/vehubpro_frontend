@@ -10,6 +10,9 @@ import AdminJobCards from './pages/AdminJobCards'
 import AdminJobCardEditor from './pages/AdminJobCardEditor'
 import AdminInvoices from './pages/AdminInvoices'
 import AdminInvoiceDetail from './pages/AdminInvoiceDetail'
+import AdminQuotations from './pages/AdminQuotations'
+import AdminQuotationEditor from './pages/AdminQuotationEditor'
+import AdminQuotationDetail from './pages/AdminQuotationDetail'
 import AdminInsights from './pages/AdminInsights'
 import AdminUsers from './pages/AdminUsers'
 import AdminPortfolio from './pages/AdminPortfolio'
@@ -47,6 +50,10 @@ export default function App() {
         <Route path="/admin/job-cards/:id" element={<AdminJobCardEditor />} />
         <Route path="/admin/invoices" element={<AdminInvoices />} />
         <Route path="/admin/invoices/:id" element={<AdminInvoiceDetail />} />
+        <Route path="/admin/quotations" element={<AdminQuotations />} />
+        <Route path="/admin/quotations/new" element={<AdminQuotationEditor />} />
+        <Route path="/admin/quotations/:id/edit" element={<AdminQuotationEditor />} />
+        <Route path="/admin/quotations/:id" element={<AdminQuotationDetail />} />
         <Route path="/admin/services" element={<AdminServices />} />
         <Route path="/admin/configuration" element={<AdminConfiguration />} />
       </Route>

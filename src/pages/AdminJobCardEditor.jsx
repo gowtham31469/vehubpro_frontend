@@ -13,7 +13,6 @@ import {
   Phone,
   Plus,
   Search,
-  Shield,
   Trash2,
   Truck,
   Wrench,
@@ -112,15 +111,15 @@ function mapApiToForm(full) {
   const lines =
     full.line_items?.length > 0
       ? full.line_items.map((li) => ({
-          key: li.id,
-          service_item: parseServiceItemPk(li.service_item) ?? '',
-          service_type: li.service_type === 'part' ? 'part' : 'labour',
-          description: li.description ?? '',
-          detail_text: li.detail_text ?? '',
-          quantity: String(li.quantity ?? 1),
-          unit_price: String(li.unit_price ?? 0),
-          discount_amount: String(li.discount_amount ?? 0),
-        }))
+        key: li.id,
+        service_item: parseServiceItemPk(li.service_item) ?? '',
+        service_type: li.service_type === 'part' ? 'part' : 'labour',
+        description: li.description ?? '',
+        detail_text: li.detail_text ?? '',
+        quantity: String(li.quantity ?? 1),
+        unit_price: String(li.unit_price ?? 0),
+        discount_amount: String(li.discount_amount ?? 0),
+      }))
       : []
   return {
     customer: String(full.customer),
@@ -638,26 +637,26 @@ export default function AdminJobCardEditor() {
       return
     }
     let cancelled = false
-    ;(async () => {
-      setLoading(true)
-      setError('')
-      try {
-        const full = await getJobCard(routeId)
-        if (cancelled) return
-        const mapped = mapApiToForm(full)
-        setForm(mapped)
-        setHeader({ jobcard_number: full.jobcard_number, updated_at: full.updated_at })
-        if (Number(mapped.discount_amount) > 0) setCouponOpen(true)
-      } catch (e) {
-        if (e.message === 'SESSION_EXPIRED') {
-          globalThis.location.href = '/admin'
-          return
+      ; (async () => {
+        setLoading(true)
+        setError('')
+        try {
+          const full = await getJobCard(routeId)
+          if (cancelled) return
+          const mapped = mapApiToForm(full)
+          setForm(mapped)
+          setHeader({ jobcard_number: full.jobcard_number, updated_at: full.updated_at })
+          if (Number(mapped.discount_amount) > 0) setCouponOpen(true)
+        } catch (e) {
+          if (e.message === 'SESSION_EXPIRED') {
+            globalThis.location.href = '/admin'
+            return
+          }
+          if (!cancelled) setError(e.message || 'Failed to load job card.')
+        } finally {
+          if (!cancelled) setLoading(false)
         }
-        if (!cancelled) setError(e.message || 'Failed to load job card.')
-      } finally {
-        if (!cancelled) setLoading(false)
-      }
-    })()
+      })()
     return () => {
       cancelled = true
     }
@@ -759,22 +758,22 @@ export default function AdminJobCardEditor() {
     filteredServices.length === 0
       ? null
       : activeServiceIndex != null &&
-          activeServiceIndex >= 0 &&
-          activeServiceIndex < filteredServices.length
+        activeServiceIndex >= 0 &&
+        activeServiceIndex < filteredServices.length
         ? activeServiceIndex
         : 0
 
   const addLineFromService = (svc) => {
     if (!svc) return
     const itemPk = parseServiceItemPk(svc.id)
-    
+
     if (itemPk && form.line_items.some((r) => resolveServiceItemPk(r, serviceItems) === itemPk)) {
       setServiceComboError(`"${svc.name}" is already added.`)
       setServiceSearch('')
       setServiceComboOpen(false)
       return
     }
-    
+
     if (itemPk) pushRecentId(itemPk)
     setRecentIds(readRecentIds())
     const row = newLineRow(svc.service_type === 'part' ? 'part' : 'labour')
@@ -894,19 +893,6 @@ export default function AdminJobCardEditor() {
     <>
       <AdminShell activeNav="job-cards">
         <div className="mx-auto max-w-6xl px-3 py-4 md:px-4">
-          {/* Compliance strip — DPDP / GDPR awareness */}
-          <div className="mb-4 flex flex-wrap items-start gap-2 rounded-xl border border-sky-200 bg-sky-50/90 px-4 py-3 text-sm text-sky-950 backdrop-blur-sm dark:border-sky-900/50 dark:bg-sky-900/20 dark:text-sky-100">
-            <Shield className="mt-0.5 h-5 w-5 shrink-0 text-sky-700 dark:text-sky-400" aria-hidden />
-            <div className="min-w-0 flex-1">
-              <p className="font-semibold text-sky-950 dark:text-sky-50">Personal &amp; vehicle data — authorized use only</p>
-              <p className="mt-1 text-xs leading-relaxed text-sky-900/90 dark:text-sky-200/70">
-                Process customer PII under your DPA, privacy notice, and lawful basis. Do not store payment card numbers, Aadhaar, or
-                other special-category data in free-text notes. Changes to job cards {isLocked ? 'are locked' : 'are subject'} to your organization&apos;s access controls
-                and audit logging.
-              </p>
-            </div>
-          </div>
-
           <nav className="mb-3 text-sm text-slate-500 dark:text-slate-400" aria-label="Breadcrumb">
             <ol className="flex flex-wrap items-center gap-1">
               <li>
@@ -984,11 +970,10 @@ export default function AdminJobCardEditor() {
                                   }
                                 }
                               }}
-                              className={`flex w-full items-center gap-3 px-3 py-2.5 text-left text-sm transition-colors ${
-                                isActive
-                                  ? 'bg-slate-50 font-semibold text-slate-900 dark:bg-slate-800 dark:text-white'
-                                  : 'text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800'
-                              }`}
+                              className={`flex w-full items-center gap-3 px-3 py-2.5 text-left text-sm transition-colors ${isActive
+                                ? 'bg-slate-50 font-semibold text-slate-900 dark:bg-slate-800 dark:text-white'
+                                : 'text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800'
+                                }`}
                             >
                               <span className={`h-1.5 w-1.5 rounded-full flex-shrink-0 ${isActive ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-slate-600'}`} />
                               {s.label}
@@ -1079,11 +1064,11 @@ export default function AdminJobCardEditor() {
               </button>
 
               <button
-                  type="button"
-                  disabled={saving || isLocked}
-                  onClick={() => void persist()}
-                  className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-800 shadow-sm transition-all hover:bg-slate-50 disabled:opacity-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700"
-                >
+                type="button"
+                disabled={saving || isLocked}
+                onClick={() => void persist()}
+                className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-800 shadow-sm transition-all hover:bg-slate-50 disabled:opacity-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700"
+              >
                 {saving ? (
                   <>
                     <svg className="h-4 w-4 animate-spin text-slate-500" fill="none" viewBox="0 0 24 24">
@@ -1113,132 +1098,132 @@ export default function AdminJobCardEditor() {
 
           {/* Vehicle — full width; customer shown compactly inline (auto-filled from vehicle) */}
           <div className="mb-6">
-                <section
-                  className="rounded-xl border border-slate-200 bg-white p-4 shadow-[0_1px_3px_rgba(15,23,42,0.06)] backdrop-blur-sm dark:border-slate-800 dark:bg-slate-900/40"
-                  aria-labelledby="veh-heading"
+            <section
+              className="rounded-xl border border-slate-200 bg-white p-4 shadow-[0_1px_3px_rgba(15,23,42,0.06)] backdrop-blur-sm dark:border-slate-800 dark:bg-slate-900/40"
+              aria-labelledby="veh-heading"
+            >
+              <div className="flex gap-3">
+                <div
+                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-slate-800 text-white shadow-sm overflow-hidden"
+                  aria-hidden
                 >
-                  <div className="flex gap-3">
-                    <div
-                      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-slate-800 text-white shadow-sm overflow-hidden"
-                      aria-hidden
+                  {selectedVehicle?.photo_url ? (
+                    <img src={selectedVehicle.photo_url} alt="" className="h-full w-full object-cover" />
+                  ) : (
+                    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.15}>
+                      <path d="M4 13h2l1.2-3.6h11.6L19 13h1M5.5 13v3.5h13V13M8 16.5h.01M16 16.5h.01" strokeLinecap="round" strokeLinejoin="round" />
+                      <path d="M6 10.5L7 8h10l1 2.5" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  )}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <h2 id="veh-heading" className="sr-only">Vehicle information</h2>
+                  <div className="relative" ref={vehRef}>
+                    <button
+                      type="button"
+                      disabled={isLocked}
+                      onClick={() => setVehOpen((o) => !o)}
+                      className="flex w-full items-start justify-between gap-2 rounded-lg text-left transition enabled:hover:bg-slate-50/80 disabled:opacity-50"
                     >
-                      {selectedVehicle?.photo_url ? (
-                        <img src={selectedVehicle.photo_url} alt="" className="h-full w-full object-cover" />
-                      ) : (
-                        <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.15}>
-                          <path d="M4 13h2l1.2-3.6h11.6L19 13h1M5.5 13v3.5h13V13M8 16.5h.01M16 16.5h.01" strokeLinecap="round" strokeLinejoin="round" />
-                          <path d="M6 10.5L7 8h10l1 2.5" strokeLinecap="round" strokeLinejoin="round" />
-                        </svg>
+                      <span className="text-base font-bold leading-snug text-slate-900 dark:text-white">
+                        {selectedVehicle
+                          ? `${selectedVehicle.brand_name || ''} ${selectedVehicle.vehicle_model_name || ''} (${selectedVehicle.year || '—'})`.trim()
+                          : 'Select vehicle'}
+                      </span>
+                      {!isLocked && (
+                        <ChevronDown
+                          size={18}
+                          className={`mt-0.5 shrink-0 text-slate-400 transition ${vehOpen ? 'rotate-180' : ''}`}
+                          aria-hidden
+                        />
                       )}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <h2 id="veh-heading" className="sr-only">Vehicle information</h2>
-                      <div className="relative" ref={vehRef}>
-                        <button
-                          type="button"
-                          disabled={isLocked}
-                          onClick={() => setVehOpen((o) => !o)}
-                          className="flex w-full items-start justify-between gap-2 rounded-lg text-left transition enabled:hover:bg-slate-50/80 disabled:opacity-50"
-                        >
-                          <span className="text-base font-bold leading-snug text-slate-900 dark:text-white">
-                            {selectedVehicle
-                              ? `${selectedVehicle.brand_name || ''} ${selectedVehicle.vehicle_model_name || ''} (${selectedVehicle.year || '—'})`.trim()
-                              : 'Select vehicle'}
-                          </span>
-                          {!isLocked && (
-                            <ChevronDown
-                              size={18}
-                              className={`mt-0.5 shrink-0 text-slate-400 transition ${vehOpen ? 'rotate-180' : ''}`}
-                              aria-hidden
-                            />
+                    </button>
+                    {vehOpen ? (
+                      <div className="absolute left-0 right-0 z-50 mt-2 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg backdrop-blur-md dark:border-slate-800 dark:bg-slate-900/90">
+                        <div className="flex items-center gap-2 border-b border-slate-100 px-3 py-2 dark:border-slate-800">
+                          <Search size={14} className="shrink-0 text-slate-400" />
+                          <input
+                            ref={vehSearchInputRef}
+                            value={vehSearch}
+                            onChange={(e) => setVehSearch(e.target.value)}
+                            placeholder="Search by plate, brand, model, owner…"
+                            className="w-full bg-transparent text-sm outline-none placeholder:text-slate-400 dark:text-white dark:placeholder:text-slate-500"
+                          />
+                        </div>
+                        <div className="max-h-52 overflow-auto py-1">
+                          {filteredVehicles.length === 0 ? (
+                            <p className="px-3 py-3 text-center text-sm text-slate-400">No matches found.</p>
+                          ) : (
+                            filteredVehicles.map((v) => (
+                              <button
+                                key={v.id}
+                                type="button"
+                                onClick={() => {
+                                  setForm((p) => ({ ...p, vehicle: String(v.id), customer: String(v.customer) }))
+                                  setVehOpen(false)
+                                }}
+                                className="flex w-full items-center gap-2.5 px-3 py-2.5 text-left text-sm hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800"
+                              >
+                                {v.photo_url ? (
+                                  <img src={v.photo_url} alt="" className="h-6 w-6 shrink-0 rounded-md object-cover shadow-sm" />
+                                ) : (
+                                  <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-slate-100 text-slate-500 shadow-sm dark:bg-slate-800 dark:text-slate-400">
+                                    <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                                      <path d="M4 13h2l1.2-3.6h11.6L19 13h1M5.5 13v3.5h13V13M8 16.5h.01M16 16.5h.01" strokeLinecap="round" strokeLinejoin="round" />
+                                      <path d="M6 10.5L7 8h10l1 2.5" strokeLinecap="round" strokeLinejoin="round" />
+                                    </svg>
+                                  </div>
+                                )}
+                                <span className="min-w-0 flex-1 truncate">{v.registration_no} · {v.brand_name} {v.vehicle_model_name}</span>
+                              </button>
+                            ))
                           )}
-                        </button>
-                        {vehOpen ? (
-                          <div className="absolute left-0 right-0 z-50 mt-2 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg backdrop-blur-md dark:border-slate-800 dark:bg-slate-900/90">
-                            <div className="flex items-center gap-2 border-b border-slate-100 px-3 py-2 dark:border-slate-800">
-                              <Search size={14} className="shrink-0 text-slate-400" />
-                              <input
-                                ref={vehSearchInputRef}
-                                value={vehSearch}
-                                onChange={(e) => setVehSearch(e.target.value)}
-                                placeholder="Search by plate, brand, model, owner…"
-                                className="w-full bg-transparent text-sm outline-none placeholder:text-slate-400 dark:text-white dark:placeholder:text-slate-500"
-                              />
-                            </div>
-                            <div className="max-h-52 overflow-auto py-1">
-                              {filteredVehicles.length === 0 ? (
-                                <p className="px-3 py-3 text-center text-sm text-slate-400">No matches found.</p>
-                              ) : (
-                                filteredVehicles.map((v) => (
-                                  <button
-                                    key={v.id}
-                                    type="button"
-                                    onClick={() => {
-                                      setForm((p) => ({ ...p, vehicle: String(v.id), customer: String(v.customer) }))
-                                      setVehOpen(false)
-                                    }}
-                                    className="flex w-full items-center gap-2.5 px-3 py-2.5 text-left text-sm hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800"
-                                  >
-                                    {v.photo_url ? (
-                                      <img src={v.photo_url} alt="" className="h-6 w-6 shrink-0 rounded-md object-cover shadow-sm" />
-                                    ) : (
-                                      <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-slate-100 text-slate-500 shadow-sm dark:bg-slate-800 dark:text-slate-400">
-                                        <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                                          <path d="M4 13h2l1.2-3.6h11.6L19 13h1M5.5 13v3.5h13V13M8 16.5h.01M16 16.5h.01" strokeLinecap="round" strokeLinejoin="round" />
-                                          <path d="M6 10.5L7 8h10l1 2.5" strokeLinecap="round" strokeLinejoin="round" />
-                                        </svg>
-                                      </div>
-                                    )}
-                                    <span className="min-w-0 flex-1 truncate">{v.registration_no} · {v.brand_name} {v.vehicle_model_name}</span>
-                                  </button>
-                                ))
-                              )}
-                            </div>
-                          </div>
+                        </div>
+                      </div>
+                    ) : null}
+                  </div>
+                  <div className="mt-3 grid grid-cols-2 gap-3 border-t border-slate-100 pt-3 dark:border-slate-800 sm:grid-cols-4">
+                    <div>
+                      <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 dark:text-slate-500">Plate</p>
+                      <p className="mt-1 text-sm font-semibold tracking-wide text-slate-900 dark:text-white">
+                        {selectedVehicle?.registration_no || '—'}
+                      </p>
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 dark:text-slate-500">VIN</p>
+                      <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                        <span className="break-all font-mono text-xs font-medium text-slate-800 dark:text-slate-200">
+                          {vinRevealed || !displayVin ? displayVin || '—' : maskVin(displayVin)}
+                        </span>
+                        {displayVin ? (
+                          <button
+                            type="button"
+                            onClick={() => setVinRevealed((r) => !r)}
+                            className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-slate-600 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400 dark:hover:bg-slate-800"
+                          >
+                            <Lock size={10} />
+                            {vinRevealed ? 'Mask' : 'Reveal'}
+                          </button>
                         ) : null}
                       </div>
-                      <div className="mt-3 grid grid-cols-2 gap-3 border-t border-slate-100 pt-3 dark:border-slate-800 sm:grid-cols-4">
-                        <div>
-                          <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 dark:text-slate-500">Plate</p>
-                          <p className="mt-1 text-sm font-semibold tracking-wide text-slate-900 dark:text-white">
-                            {selectedVehicle?.registration_no || '—'}
-                          </p>
-                        </div>
-                        <div className="min-w-0">
-                          <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 dark:text-slate-500">VIN</p>
-                          <div className="mt-1 flex flex-wrap items-center gap-1.5">
-                            <span className="break-all font-mono text-xs font-medium text-slate-800 dark:text-slate-200">
-                              {vinRevealed || !displayVin ? displayVin || '—' : maskVin(displayVin)}
-                            </span>
-                            {displayVin ? (
-                              <button
-                                type="button"
-                                onClick={() => setVinRevealed((r) => !r)}
-                                className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-slate-600 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400 dark:hover:bg-slate-800"
-                              >
-                                <Lock size={10} />
-                                {vinRevealed ? 'Mask' : 'Reveal'}
-                              </button>
-                            ) : null}
-                          </div>
-                        </div>
-                        <div className="min-w-0">
-                          <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 dark:text-slate-500">Customer</p>
-                          <p className="mt-1 truncate text-sm font-semibold tracking-wide text-slate-900 dark:text-white">
-                            {selectedCustomer?.full_name || '—'}
-                          </p>
-                        </div>
-                        <div className="min-w-0">
-                          <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 dark:text-slate-500">Phone</p>
-                          <p className="mt-1 flex items-center gap-1.5 text-xs font-medium text-slate-800 dark:text-slate-200">
-                            <Phone size={12} className="shrink-0 text-slate-400 dark:text-slate-500" strokeWidth={2} aria-hidden />
-                            <span className="min-w-0 truncate">{displayPhone}</span>
-                          </p>
-                        </div>
-                      </div>
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 dark:text-slate-500">Customer</p>
+                      <p className="mt-1 truncate text-sm font-semibold tracking-wide text-slate-900 dark:text-white">
+                        {selectedCustomer?.full_name || '—'}
+                      </p>
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 dark:text-slate-500">Phone</p>
+                      <p className="mt-1 flex items-center gap-1.5 text-xs font-medium text-slate-800 dark:text-slate-200">
+                        <Phone size={12} className="shrink-0 text-slate-400 dark:text-slate-500" strokeWidth={2} aria-hidden />
+                        <span className="min-w-0 truncate">{displayPhone}</span>
+                      </p>
                     </div>
                   </div>
-                </section>
+                </div>
+              </div>
+            </section>
           </div>
 
           {/* Main column: services & lines · Sidebar: financial summary (starts beside services) */}
@@ -1345,83 +1330,82 @@ export default function AdminJobCardEditor() {
                             width: `${dropdownPos.width}px`,
                           }}
                         >
-                        {filteredServices.length === 0 ? (
-                          <li className="px-4 py-4 text-center text-xs text-slate-400">
-                            {serviceSearch.trim()
-                              ? `No matches for "${serviceSearch.trim()}"`
-                              : 'No services in catalog'}
-                          </li>
-                        ) : (
-                          filteredServices.map((s, i) => {
-                            const active = i === highlightIndex
-                            return (
-                              <li key={s.id} role="presentation">
-                                <button
-                                  id={`jobcard-svc-opt-${s.id}`}
-                                  type="button"
-                                  role="option"
-                                  aria-selected={active}
-                                  onMouseDown={(e) => e.preventDefault()}
-                                  onMouseEnter={() => setActiveServiceIndex(i)}
-                                  onClick={() => {
-                                    setServiceSearch(s.name || '')
-                                    setActiveServiceIndex(i)
-                                    setServiceComboOpen(false)
-                                  }}
-                                  className={`flex w-full items-center gap-3 px-3 py-2.5 text-left transition ${
-                                    active ? 'bg-slate-100 dark:bg-slate-800' : 'hover:bg-slate-50 dark:hover:bg-slate-800/50'
-                                  }`}
-                                >
-                                  {/* Icon box */}
-                                  {s.image_url ? (
-                                    <img
-                                      src={s.image_url}
-                                      alt=""
-                                      className="h-9 w-9 shrink-0 rounded-lg object-cover border border-slate-200 dark:border-slate-700"
-                                    />
-                                  ) : (
-                                    <span
-                                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg"
-                                      style={{ backgroundColor: active ? `${theme.accent}22` : theme.mode === 'dark' ? '#1e293b' : '#f1f5f9' }}
-                                    >
-                                      <Wrench
-                                        size={16}
-                                        style={{ color: active ? theme.accent : '#64748b' }}
+                          {filteredServices.length === 0 ? (
+                            <li className="px-4 py-4 text-center text-xs text-slate-400">
+                              {serviceSearch.trim()
+                                ? `No matches for "${serviceSearch.trim()}"`
+                                : 'No services in catalog'}
+                            </li>
+                          ) : (
+                            filteredServices.map((s, i) => {
+                              const active = i === highlightIndex
+                              return (
+                                <li key={s.id} role="presentation">
+                                  <button
+                                    id={`jobcard-svc-opt-${s.id}`}
+                                    type="button"
+                                    role="option"
+                                    aria-selected={active}
+                                    onMouseDown={(e) => e.preventDefault()}
+                                    onMouseEnter={() => setActiveServiceIndex(i)}
+                                    onClick={() => {
+                                      setServiceSearch(s.name || '')
+                                      setActiveServiceIndex(i)
+                                      setServiceComboOpen(false)
+                                    }}
+                                    className={`flex w-full items-center gap-3 px-3 py-2.5 text-left transition ${active ? 'bg-slate-100 dark:bg-slate-800' : 'hover:bg-slate-50 dark:hover:bg-slate-800/50'
+                                      }`}
+                                  >
+                                    {/* Icon box */}
+                                    {s.image_url ? (
+                                      <img
+                                        src={s.image_url}
+                                        alt=""
+                                        className="h-9 w-9 shrink-0 rounded-lg object-cover border border-slate-200 dark:border-slate-700"
                                       />
-                                    </span>
-                                  )}
-
-                                  {/* Name + description */}
-                                  <span className="min-w-0 flex-1">
-                                    <span className="block truncate text-sm font-semibold text-slate-800 dark:text-slate-100">
-                                      {s.name}
-                                    </span>
-                                    {s.description ? (
-                                      <span className="block truncate text-xs text-slate-400 leading-tight mt-0.5 dark:text-slate-500">
-                                        {s.description}
+                                    ) : (
+                                      <span
+                                        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg"
+                                        style={{ backgroundColor: active ? `${theme.accent}22` : theme.mode === 'dark' ? '#1e293b' : '#f1f5f9' }}
+                                      >
+                                        <Wrench
+                                          size={16}
+                                          style={{ color: active ? theme.accent : '#64748b' }}
+                                        />
                                       </span>
-                                    ) : s.category_name ? (
-                                      <span className="block truncate text-xs text-slate-400 leading-tight mt-0.5 dark:text-slate-500">
-                                        {s.category_name}
-                                      </span>
-                                    ) : null}
-                                  </span>
+                                    )}
 
-                                  {/* Price + label */}
-                                  <span className="shrink-0 text-right">
-                                    <span className="block text-sm font-bold text-slate-800 dark:text-slate-100 tabular-nums">
-                                      {fmtMoney(s.base_price)}
+                                    {/* Name + description */}
+                                    <span className="min-w-0 flex-1">
+                                      <span className="block truncate text-sm font-semibold text-slate-800 dark:text-slate-100">
+                                        {s.name}
+                                      </span>
+                                      {s.description ? (
+                                        <span className="block truncate text-xs text-slate-400 leading-tight mt-0.5 dark:text-slate-500">
+                                          {s.description}
+                                        </span>
+                                      ) : s.category_name ? (
+                                        <span className="block truncate text-xs text-slate-400 leading-tight mt-0.5 dark:text-slate-500">
+                                          {s.category_name}
+                                        </span>
+                                      ) : null}
                                     </span>
-                                    <span className="block text-[10px] font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">
-                                      Base Price
+
+                                    {/* Price + label */}
+                                    <span className="shrink-0 text-right">
+                                      <span className="block text-sm font-bold text-slate-800 dark:text-slate-100 tabular-nums">
+                                        {fmtMoney(s.base_price)}
+                                      </span>
+                                      <span className="block text-[10px] font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">
+                                        Base Price
+                                      </span>
                                     </span>
-                                  </span>
-                                </button>
-                              </li>
-                            )
-                          })
-                        )}
-                      </ul>,
+                                  </button>
+                                </li>
+                              )
+                            })
+                          )}
+                        </ul>,
                         document.getElementById('dropdown-portal')
                       )
                     }
@@ -1450,39 +1434,39 @@ export default function AdminJobCardEditor() {
                     <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400 dark:text-slate-500">
                       Recent:
                     </span>
-                      {recentIds.map((rid) => {
-                        const s = serviceItems.find((x) => String(x.id) === rid)
-                        if (!s) return null
-                        return (
-                          <div
-                            key={rid}
-                            className="inline-flex overflow-hidden rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-800 shadow-sm transition hover:border-slate-300 hover:shadow-md dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                    {recentIds.map((rid) => {
+                      const s = serviceItems.find((x) => String(x.id) === rid)
+                      if (!s) return null
+                      return (
+                        <div
+                          key={rid}
+                          className="inline-flex overflow-hidden rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-800 shadow-sm transition hover:border-slate-300 hover:shadow-md dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                        >
+                          <button
+                            type="button"
+                            onClick={() => !isLocked && addLineFromService(s)}
+                            disabled={isLocked}
+                            className="inline-flex min-w-0 items-center gap-1.5 px-2.5 py-1 text-left hover:bg-slate-50/90 disabled:cursor-default dark:hover:bg-slate-800/60"
                           >
+                            <span className="max-w-[10rem] truncate">{s.name}</span>
+                            <span className="tabular-nums text-slate-500 dark:text-slate-400">{fmtMoney(s.base_price)}</span>
+                          </button>
+                          {!isLocked && (
                             <button
                               type="button"
-                              onClick={() => !isLocked && addLineFromService(s)}
-                              disabled={isLocked}
-                              className="inline-flex min-w-0 items-center gap-1.5 px-2.5 py-1 text-left hover:bg-slate-50/90 disabled:cursor-default dark:hover:bg-slate-800/60"
+                              aria-label={`Remove ${s.name} from recent`}
+                              onClick={() => {
+                                removeRecentId(rid)
+                                setRecentIds(readRecentIds())
+                              }}
+                              className="flex shrink-0 items-center border-l border-slate-200 px-1.5 py-1 text-slate-400 transition hover:bg-rose-50 hover:text-rose-600 dark:border-slate-700"
                             >
-                              <span className="max-w-[10rem] truncate">{s.name}</span>
-                              <span className="tabular-nums text-slate-500 dark:text-slate-400">{fmtMoney(s.base_price)}</span>
+                              <X size={15} strokeWidth={2.25} aria-hidden />
                             </button>
-                            {!isLocked && (
-                              <button
-                                type="button"
-                                aria-label={`Remove ${s.name} from recent`}
-                                onClick={() => {
-                                  removeRecentId(rid)
-                                  setRecentIds(readRecentIds())
-                                }}
-                                className="flex shrink-0 items-center border-l border-slate-200 px-1.5 py-1 text-slate-400 transition hover:bg-rose-50 hover:text-rose-600 dark:border-slate-700"
-                              >
-                                <X size={15} strokeWidth={2.25} aria-hidden />
-                              </button>
-                            )}
-                          </div>
-                        )
-                      })}
+                          )}
+                        </div>
+                      )
+                    })}
                   </div>
                 ) : null}
               </section>
@@ -1493,35 +1477,35 @@ export default function AdminJobCardEditor() {
               ]
                 .filter(({ rows }) => rows.length > 0)
                 .map(({ title, rows, total }) => (
-                <section
-                  key={title}
-                  className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-[0_1px_3px_rgba(15,23,42,0.06)] backdrop-blur-sm dark:border-slate-800 dark:bg-slate-900/40"
-                >
-                  <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4 dark:border-slate-800">
-                    <h2 className="text-base font-bold text-slate-900 dark:text-white">{title}</h2>
-                    <span className="text-sm font-semibold text-slate-500 dark:text-slate-400">
-                      Total: {fmtMoney(total)}
-                    </span>
-                  </div>
-                  <div className="overflow-x-auto">
-                    <table className="min-w-full text-left text-sm">
-                      <thead className="bg-slate-50 text-xs font-bold uppercase tracking-wider text-slate-500 dark:bg-slate-800/50 dark:text-slate-400">
-                        <tr>
-                          <th className="px-5 py-4 text-[10px] tracking-widest">Service</th>
-                          <th className="px-5 py-4 text-right text-[10px] tracking-widest">Qty</th>
-                          <th className="px-5 py-4 text-right text-[10px] tracking-widest">Unit price</th>
-                          <th className="px-5 py-4 text-right text-[10px] tracking-widest">Tax (alloc.)</th>
-                          <th className="px-5 py-4 text-right text-[10px] tracking-widest">Total</th>
-                          <th className="px-5 py-4 w-12" />
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                        {rows.map(renderLineRow)}
-                      </tbody>
-                    </table>
-                  </div>
-                </section>
-              ))}
+                  <section
+                    key={title}
+                    className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-[0_1px_3px_rgba(15,23,42,0.06)] backdrop-blur-sm dark:border-slate-800 dark:bg-slate-900/40"
+                  >
+                    <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4 dark:border-slate-800">
+                      <h2 className="text-base font-bold text-slate-900 dark:text-white">{title}</h2>
+                      <span className="text-sm font-semibold text-slate-500 dark:text-slate-400">
+                        Total: {fmtMoney(total)}
+                      </span>
+                    </div>
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full text-left text-sm">
+                        <thead className="bg-slate-50 text-xs font-bold uppercase tracking-wider text-slate-500 dark:bg-slate-800/50 dark:text-slate-400">
+                          <tr>
+                            <th className="px-5 py-4 text-[10px] tracking-widest">Service</th>
+                            <th className="px-5 py-4 text-right text-[10px] tracking-widest">Qty</th>
+                            <th className="px-5 py-4 text-right text-[10px] tracking-widest">Unit price</th>
+                            <th className="px-5 py-4 text-right text-[10px] tracking-widest">Tax (alloc.)</th>
+                            <th className="px-5 py-4 text-right text-[10px] tracking-widest">Total</th>
+                            <th className="px-5 py-4 w-12" />
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                          {rows.map(renderLineRow)}
+                        </tbody>
+                      </table>
+                    </div>
+                  </section>
+                ))}
 
               <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-[0_1px_3px_rgba(15,23,42,0.06)] backdrop-blur-sm dark:border-slate-800 dark:bg-slate-900/40">
                 <h2 className="text-base font-bold text-slate-900 dark:text-white">Internal staff notes</h2>
@@ -1718,16 +1702,16 @@ export default function AdminJobCardEditor() {
                   CGST/SGST are half of each line&apos;s catalog GST rate, rounded per line then summed. Final amounts follow the server after save.
                 </p>
               </div>
-              <p className="rounded-xl border border-amber-200 bg-amber-50/90 px-4 py-3 text-xs text-amber-950 dark:border-amber-900/40 dark:bg-amber-900/10 dark:text-amber-200/80">
+              {/* <p className="rounded-xl border border-amber-200 bg-amber-50/90 px-4 py-3 text-xs text-amber-950 dark:border-amber-900/40 dark:bg-amber-900/10 dark:text-amber-200/80">
                 <strong>ISO 27001 / SOC-style practice:</strong> restrict admin access, review audit logs regularly, define retention for job cards, and document subprocessors in your ROPA / privacy policy.
-              </p>
+              </p> */}
             </aside>
           </div>
 
-          <footer className="mt-10 border-t border-slate-200 py-8 text-center text-xs text-slate-400 dark:border-slate-800 dark:text-slate-600">
+          {/* <footer className="mt-10 border-t border-slate-200 py-8 text-center text-xs text-slate-400 dark:border-slate-800 dark:text-slate-600">
             <p>Internal use only · Personal data processed per tenant privacy program · VeHubPro</p>
             {header.updated_at ? <p className="mt-1.5">Record last updated: {new Date(header.updated_at).toLocaleString()}</p> : null}
-          </footer>
+          </footer> */}
         </div>
 
         {/* Next Service Recommendation Modal */}
