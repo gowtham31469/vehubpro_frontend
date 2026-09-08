@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import ReactDOM from 'react-dom'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import {
   ArrowLeft,
   Ban,
+  ChevronDown,
   CreditCard,
   Download,
   History,
@@ -241,13 +243,22 @@ export default function AdminInvoiceDetail() {
   const [cancelOpen, setCancelOpen] = useState(false)
   const [pdfLoading, setPdfLoading] = useState(false)
 
+  // Download-time layout overrides — start Terms & Conditions / Our account
+  // details on a fresh page instead of flowing naturally. Both default to the
+  // standard, space-efficient layout.
+  const [termsNewPage, setTermsNewPage] = useState(false)
+  const [bankNewPage, setBankNewPage] = useState(false)
+  const [pdfOptionsOpen, setPdfOptionsOpen] = useState(false)
+  const [pdfOptionsPos, setPdfOptionsPos] = useState({ top: 0, left: 0 })
+  const pdfOptionsRef = useRef(null)
+  const pdfOptionsPanelRef = useRef(null)
+
   const load = useCallback(async () => {
     setLoading(true)
     setError('')
     try {
-      const [data, html] = await Promise.all([getInvoice(id), fetchInvoicePreviewHtml(id)])
+      const data = await getInvoice(id)
       setInvoice(data)
-      setPreviewHtml(html)
     } catch (e) {
       if (e.message === 'SESSION_EXPIRED') { globalThis.location.href = '/admin'; return }
       setError(e.message || 'Failed to load invoice.')
@@ -257,6 +268,57 @@ export default function AdminInvoiceDetail() {
   }, [id])
 
   useEffect(() => { void load() }, [load])
+
+  // Preview HTML reflects the current layout toggles, and re-fetches whenever
+  // they change — so the on-screen preview matches what "Download PDF" will
+  // actually produce, without gating the rest of the page behind it.
+  useEffect(() => {
+    let cancelled = false
+    fetchInvoicePreviewHtml(id, { termsNewPage, bankNewPage })
+      .then((html) => { if (!cancelled) setPreviewHtml(html) })
+      .catch((e) => {
+        if (e.message === 'SESSION_EXPIRED') { globalThis.location.href = '/admin' }
+      })
+    return () => { cancelled = true }
+  }, [id, termsNewPage, bankNewPage])
+
+  useEffect(() => {
+    if (!pdfOptionsOpen) return undefined
+    const handlePointerDown = (event) => {
+      if (pdfOptionsRef.current && pdfOptionsRef.current.contains(event.target)) return
+      if (pdfOptionsPanelRef.current && pdfOptionsPanelRef.current.contains(event.target)) return
+      setPdfOptionsOpen(false)
+    }
+    document.addEventListener('mousedown', handlePointerDown)
+    return () => document.removeEventListener('mousedown', handlePointerDown)
+  }, [pdfOptionsOpen])
+
+  // The trigger sits inside the header's clipped/overflow-hidden content column,
+  // so a plain CSS-absolute panel gets cut off behind the sidebar. Render it in
+  // a portal and position it via getBoundingClientRect, matching the fix already
+  // used for SearchableSelect's dropdown.
+  useEffect(() => {
+    if (!pdfOptionsOpen || !pdfOptionsRef.current) return undefined
+
+    const updatePosition = () => {
+      if (!pdfOptionsRef.current) return
+      const rect = pdfOptionsRef.current.getBoundingClientRect()
+      setPdfOptionsPos({ top: rect.bottom + 8, left: rect.right - 256 })
+    }
+
+    updatePosition()
+
+    const scrollableParent = pdfOptionsRef.current.closest('main')
+    if (scrollableParent) scrollableParent.addEventListener('scroll', updatePosition, { passive: true })
+    window.addEventListener('scroll', updatePosition, { passive: true })
+    window.addEventListener('resize', updatePosition, { passive: true })
+
+    return () => {
+      if (scrollableParent) scrollableParent.removeEventListener('scroll', updatePosition)
+      window.removeEventListener('scroll', updatePosition)
+      window.removeEventListener('resize', updatePosition)
+    }
+  }, [pdfOptionsOpen])
 
   if (loading) {
     return (
@@ -332,34 +394,80 @@ export default function AdminInvoiceDetail() {
 
               {/* Action buttons: organized in a clean row */}
               <div className="flex flex-wrap items-center gap-2">
-                {/* Primary action: Download PDF */}
-                <button
-                  type="button"
-                  disabled={pdfLoading}
-                  onClick={async () => {
-                    setPdfLoading(true)
-                    try {
-                      const { pdf_url } = await generateInvoicePdf(invoice.id, { force: true })
-                      window.open(pdf_url, '_blank', 'noopener,noreferrer')
-                    } catch (err) {
-                      showToast('error', err.message || 'Failed to generate PDF.')
-                    } finally {
-                      setPdfLoading(false)
-                    }
-                  }}
-                  className="inline-flex items-center gap-2 rounded-lg text-white px-4 py-2 text-sm font-semibold shadow-md transition disabled:opacity-50 hover:opacity-90"
-                  style={{ backgroundColor: theme.accent }}
-                >
-                  {pdfLoading ? (
-                    <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
-                    </svg>
-                  ) : (
-                    <Download size={16} />
-                  )}
-                  {pdfLoading ? 'Generating…' : 'Download PDF'}
-                </button>
+                {/* Primary action: Download PDF (split button — layout options on the right) */}
+                <div className="relative inline-flex" ref={pdfOptionsRef}>
+                  <div className="inline-flex overflow-hidden rounded-lg shadow-md" style={{ backgroundColor: theme.accent }}>
+                    <button
+                      type="button"
+                      disabled={pdfLoading}
+                      onClick={async () => {
+                        setPdfLoading(true)
+                        try {
+                          const { pdf_url } = await generateInvoicePdf(invoice.id, { force: true, termsNewPage, bankNewPage })
+                          window.open(pdf_url, '_blank', 'noopener,noreferrer')
+                        } catch (err) {
+                          showToast('error', err.message || 'Failed to generate PDF.')
+                        } finally {
+                          setPdfLoading(false)
+                        }
+                      }}
+                      className="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white transition disabled:opacity-50 hover:opacity-90"
+                    >
+                      {pdfLoading ? (
+                        <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+                        </svg>
+                      ) : (
+                        <Download size={16} />
+                      )}
+                      {pdfLoading ? 'Generating…' : 'Download PDF'}
+                    </button>
+                    <button
+                      type="button"
+                      aria-label="PDF layout options"
+                      onClick={() => setPdfOptionsOpen((o) => !o)}
+                      className="flex items-center border-l border-white/20 px-2 text-white transition hover:opacity-90"
+                    >
+                      <ChevronDown size={16} className={`transition-transform ${pdfOptionsOpen ? 'rotate-180' : ''}`} />
+                    </button>
+                  </div>
+                  {pdfOptionsOpen
+                    ? ReactDOM.createPortal(
+                        <div
+                          ref={pdfOptionsPanelRef}
+                          className="fixed z-[9999] w-64 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 p-3 text-left shadow-2xl"
+                          style={{ top: `${pdfOptionsPos.top}px`, left: `${pdfOptionsPos.left}px` }}
+                        >
+                          <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">PDF page breaks</p>
+                          <label className="flex items-center gap-2.5 py-1.5 text-sm font-medium text-slate-700 dark:text-slate-200">
+                            <input
+                              type="checkbox"
+                              checked={termsNewPage}
+                              onChange={(e) => setTermsNewPage(e.target.checked)}
+                              className="h-4 w-4 shrink-0 rounded border border-slate-400 dark:border-slate-600 bg-white dark:bg-slate-900"
+                              style={{ accentColor: theme.accent }}
+                            />
+                            Start Terms &amp; Conditions on a new page
+                          </label>
+                          <label className="flex items-center gap-2.5 py-1.5 text-sm font-medium text-slate-700 dark:text-slate-200">
+                            <input
+                              type="checkbox"
+                              checked={bankNewPage}
+                              onChange={(e) => setBankNewPage(e.target.checked)}
+                              className="h-4 w-4 shrink-0 rounded border border-slate-400 dark:border-slate-600 bg-white dark:bg-slate-900"
+                              style={{ accentColor: theme.accent }}
+                            />
+                            Start Account Details on a new page
+                          </label>
+                          <p className="mt-2 text-[10px] leading-relaxed text-slate-500 dark:text-slate-500">
+                            Applies to this preview and the next download only — the default download is unaffected.
+                          </p>
+                        </div>,
+                        document.body,
+                      )
+                    : null}
+                </div>
 
                 {/* Secondary actions */}
                 <div className="flex items-center gap-2 border-l border-slate-200 dark:border-slate-700 pl-2">

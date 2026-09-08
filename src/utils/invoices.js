@@ -22,9 +22,17 @@ export async function getInvoice(id) {
   return parseResponse(`/api/v1/invoices/${id}/`, { method: 'GET' }, 'Failed to load invoice.')
 }
 
-/** Raw HTML (same template used to generate the PDF) for embedding in an iframe preview. */
-export async function fetchInvoicePreviewHtml(id) {
-  const { response, text } = await apiFetch(`/api/v1/invoices/${id}/preview-html/`, { method: 'GET' })
+/**
+ * Raw HTML (same template used to generate the PDF) for embedding in an iframe preview.
+ * termsNewPage/bankNewPage mirror the same layout toggles accepted by generateInvoicePdf,
+ * so the preview reflects the layout the user is about to download.
+ */
+export async function fetchInvoicePreviewHtml(id, { termsNewPage = false, bankNewPage = false } = {}) {
+  const params = new URLSearchParams()
+  if (termsNewPage) params.set('terms_new_page', 'true')
+  if (bankNewPage) params.set('bank_new_page', 'true')
+  const qs = params.toString()
+  const { response, text } = await apiFetch(`/api/v1/invoices/${id}/preview-html/${qs ? `?${qs}` : ''}`, { method: 'GET' })
   if (!response.ok) {
     throw new Error('Failed to load invoice preview.')
   }
@@ -55,7 +63,18 @@ export async function generateInvoiceFromJobCard(jobCardId, payload = {}) {
   )
 }
 
-export async function generateInvoicePdf(invoiceId, { force = false } = {}) {
-  const url = `/api/v1/invoices/${invoiceId}/generate-pdf/${force ? '?force=true' : ''}`
+/**
+ * termsNewPage/bankNewPage are download-time layout overrides — start "Terms &
+ * Conditions" / "Our account details" on a fresh page instead of flowing
+ * naturally. Either one always generates a fresh, one-off PDF (never the
+ * cached default), so it never affects what a plain "Download PDF" returns.
+ */
+export async function generateInvoicePdf(invoiceId, { force = false, termsNewPage = false, bankNewPage = false } = {}) {
+  const params = new URLSearchParams()
+  if (force) params.set('force', 'true')
+  if (termsNewPage) params.set('terms_new_page', 'true')
+  if (bankNewPage) params.set('bank_new_page', 'true')
+  const qs = params.toString()
+  const url = `/api/v1/invoices/${invoiceId}/generate-pdf/${qs ? `?${qs}` : ''}`
   return parseResponse(url, { method: 'POST' }, 'Failed to generate PDF.')
 }
