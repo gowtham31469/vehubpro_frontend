@@ -89,6 +89,9 @@ function newLineRow(serviceType = 'labour') {
     quantity: '1',
     unit_price: '0',
     discount_amount: '0',
+    // Blank = follow the linked catalog item's GST% (or 0% if none); set to
+    // override it for this line only.
+    gst_percentage: '',
   }
 }
 
@@ -119,6 +122,7 @@ function mapApiToForm(full) {
         quantity: String(li.quantity ?? 1),
         unit_price: String(li.unit_price ?? 0),
         discount_amount: String(li.discount_amount ?? 0),
+        gst_percentage: li.gst_percentage != null ? String(li.gst_percentage) : '',
       }))
       : []
   return {
@@ -197,8 +201,17 @@ function resolveServiceItemPk(row, items) {
   return null
 }
 
-/** Catalog GST % for one line, or null if not linked / unknown. */
+/**
+ * Effective GST % for one line: an explicit per-row override (row.gst_percentage)
+ * always wins; otherwise falls back to the linked catalog item's rate, or null
+ * if neither is set (rendered as "No catalog GST (0%)" in the breakdown).
+ */
 function lineCatalogGstPercent(row, serviceItems) {
+  const override = row.gst_percentage
+  if (override !== undefined && override !== null && String(override).trim() !== '') {
+    const overridden = Number(override)
+    if (Number.isFinite(overridden)) return overridden
+  }
   const pk = resolveServiceItemPk(row, serviceItems)
   if (!pk) return null
   const item = (serviceItems || []).find((s) => String(s.id) === pk)
@@ -582,6 +595,30 @@ export default function AdminJobCardEditor() {
             disabled={isLocked}
           />
         </td>
+        <td className="px-5 py-4 text-right tabular-nums">
+          <input
+            type="number"
+            step="0.01"
+            min="0"
+            max="100"
+            value={row.gst_percentage}
+            readOnly={isLocked}
+            onChange={(e) =>
+              !isLocked && setForm((p) => ({
+                ...p,
+                line_items: p.line_items.map((r) => (r.key === row.key ? { ...r, gst_percentage: e.target.value } : r)),
+              }))
+            }
+            placeholder={(() => {
+              const pk = resolveServiceItemPk(row, serviceItems)
+              const item = pk ? serviceItems.find((s) => String(s.id) === pk) : null
+              return item ? formatGstPercentLabel(Number(item.gst_percentage) || 0) : '0'
+            })()}
+            title="Leave blank to use the catalog item's GST%"
+            className="w-16 rounded-lg border border-slate-200 bg-white px-2 py-1 text-right tabular-nums focus:border-slate-300 outline-none dark:border-slate-800 dark:bg-slate-900 dark:text-white dark:focus:border-slate-700 disabled:opacity-50"
+            disabled={isLocked}
+          />
+        </td>
         <td className="px-5 py-4 text-right tabular-nums text-slate-600 dark:text-slate-400">{fmtMoney(tax)}</td>
         <td className="px-5 py-4 text-right font-semibold tabular-nums text-slate-900 dark:text-white">{fmtMoney(lineNet + tax)}</td>
         <td className="px-5 py-4">
@@ -781,6 +818,7 @@ export default function AdminJobCardEditor() {
     row.description = svc.name || ''
     row.detail_text = (svc.description || '').trim().slice(0, 500)
     row.unit_price = String(svc.base_price ?? 0)
+    row.gst_percentage = svc.gst_percentage != null ? String(svc.gst_percentage) : ''
     setForm((p) => ({
       ...p,
       line_items: [...p.line_items.filter((r) => (r.description || '').trim() || resolveServiceItemPk(r, serviceItems) != null), row],
@@ -835,6 +873,7 @@ export default function AdminJobCardEditor() {
         quantity: String(row.quantity || '1'),
         unit_price: String(row.unit_price || '0'),
         discount_amount: String(row.discount_amount || '0'),
+        gst_percentage: (row.gst_percentage ?? '').toString().trim() === '' ? '' : String(row.gst_percentage),
       }))
       .filter((row) => (row.description || '').trim() || row.service_item != null)
     const payload = {
@@ -1494,6 +1533,7 @@ export default function AdminJobCardEditor() {
                             <th className="px-5 py-4 text-[10px] tracking-widest">Service</th>
                             <th className="px-5 py-4 text-right text-[10px] tracking-widest">Qty</th>
                             <th className="px-5 py-4 text-right text-[10px] tracking-widest">Unit price</th>
+                            <th className="px-5 py-4 text-right text-[10px] tracking-widest">GST %</th>
                             <th className="px-5 py-4 text-right text-[10px] tracking-widest">Tax (alloc.)</th>
                             <th className="px-5 py-4 text-right text-[10px] tracking-widest">Total</th>
                             <th className="px-5 py-4 w-12" />

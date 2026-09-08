@@ -32,9 +32,18 @@ export async function fetchPaymentDistribution() {
   return parseResponse('/api/v1/dashboard/payment-distribution/', 'Failed to fetch payment distribution.')
 }
 
-export async function fetchTopServices(limit = 6, months = 3) {
+export async function fetchTopServices(limit = 6, { months = 3, currentMonth = false, month, year } = {}) {
+  const params = new URLSearchParams({ limit: String(limit) })
+  if (month && year) {
+    params.set('month', String(month))
+    params.set('year', String(year))
+  } else if (currentMonth) {
+    params.set('current_month', 'true')
+  } else {
+    params.set('months', String(months))
+  }
   return parseResponse(
-    `/api/v1/dashboard/top-services/?limit=${limit}&months=${months}`,
+    `/api/v1/dashboard/top-services/?${params.toString()}`,
     'Failed to fetch top services.',
   )
 }

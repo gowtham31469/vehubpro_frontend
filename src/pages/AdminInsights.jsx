@@ -29,6 +29,11 @@ function monthLabel(yyyyMm) {
   return new Date(Number(y), Number(m) - 1).toLocaleString('en-US', { month: 'short' }).toUpperCase()
 }
 
+const MONTH_NAMES = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
+]
+
 // ── SVG revenue chart ─────────────────────────────────────────────────────────
 
 function buildSvgPath(points, w = 760, h = 180, pad = 20) {
@@ -85,23 +90,26 @@ export default function AdminInsights() {
   const [services, setServices] = useState([])
   const [loading, setLoading]   = useState(true)
 
+  const today = new Date()
+  const [servicesMonth, setServicesMonth] = useState(today.getMonth() + 1)
+  const [servicesYear, setServicesYear]   = useState(today.getFullYear())
+  const [servicesLoading, setServicesLoading] = useState(true)
+
   useEffect(() => {
     let cancelled = false
     async function load() {
       try {
-        const [s, t, f, p, sv] = await Promise.all([
+        const [s, t, f, p] = await Promise.all([
           fetchDashboardSummary(),
           fetchRevenueTrend(6),
           fetchJobCardFunnel(),
           fetchPaymentDistribution(),
-          fetchTopServices(6, 3),
         ])
         if (cancelled) return
         setSummary(s)
         setTrend(Array.isArray(t) ? t : [])
         setFunnel(Array.isArray(f) ? f : [])
         setPayments(Array.isArray(p) ? p : [])
-        setServices(Array.isArray(sv) ? sv : [])
       } catch (e) {
         if (e.message === 'SESSION_EXPIRED') { globalThis.location.href = '/admin'; return }
       } finally {
@@ -112,10 +120,30 @@ export default function AdminInsights() {
     return () => { cancelled = true }
   }, [])
 
+  // Independent from the rest of the dashboard so switching the month/year
+  // filter only re-fetches this one widget.
+  useEffect(() => {
+    let cancelled = false
+    async function loadServices() {
+      setServicesLoading(true)
+      try {
+        const sv = await fetchTopServices(6, { month: servicesMonth, year: servicesYear })
+        if (cancelled) return
+        setServices(Array.isArray(sv) ? sv : [])
+      } catch (e) {
+        if (e.message === 'SESSION_EXPIRED') { globalThis.location.href = '/admin'; return }
+      } finally {
+        if (!cancelled) setServicesLoading(false)
+      }
+    }
+    void loadServices()
+    return () => { cancelled = true }
+  }, [servicesMonth, servicesYear])
+
   const funnelMap     = Object.fromEntries(funnel.map((f) => [f.status, f.count]))
   const totalFunnel   = funnel.reduce((a, f) => a + (f.count || 0), 0) || 1
   const { line, area } = buildSvgPath(trend)
-  const maxRevenue    = Math.max(...services.map((s) => s.revenue), 1)
+  const maxServiceTotal = Math.max(...services.map((s) => s.total ?? s.revenue), 1)
   const totalPaid     = payments.reduce((a, p) => a + (p.total_amount || 0), 0) || 1
 
   return (
@@ -312,38 +340,63 @@ export default function AdminInsights() {
 
         {/* ── Top services ── */}
         <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800/60 dark:bg-slate-900/40">
-          <div className="mb-5 flex items-center justify-between">
+          <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
             <div>
               <h3 className="text-xl font-bold text-slate-900 dark:text-white">Top Services</h3>
-              <p className="text-xs font-bold uppercase tracking-widest text-slate-400">Last 3 Months · By Revenue</p>
+              <p className="text-xs font-bold uppercase tracking-widest text-slate-400">
+                {MONTH_NAMES[servicesMonth - 1]} {servicesYear} · By Revenue
+              </p>
             </div>
-            <div className="flex items-center gap-2 rounded-xl bg-slate-100 px-3 py-1.5 dark:bg-slate-800">
-              <Wrench size={13} className="text-slate-500" />
-              <span className="text-xs font-bold text-slate-500 dark:text-slate-400">Billed Work</span>
+            <div className="flex items-center gap-2">
+              <select
+                value={servicesMonth}
+                onChange={(e) => setServicesMonth(Number(e.target.value))}
+                className="rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 outline-none focus:border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
+              >
+                {MONTH_NAMES.map((name, i) => (
+                  <option key={name} value={i + 1}>{name}</option>
+                ))}
+              </select>
+              <select
+                value={servicesYear}
+                onChange={(e) => setServicesYear(Number(e.target.value))}
+                className="rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 outline-none focus:border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
+              >
+                {Array.from({ length: 4 }, (_, i) => today.getFullYear() - i).map((y) => (
+                  <option key={y} value={y}>{y}</option>
+                ))}
+              </select>
+              <div className="flex items-center gap-2 rounded-xl bg-slate-100 px-3 py-1.5 dark:bg-slate-800">
+                <Wrench size={13} className="text-slate-500" />
+                <span className="text-xs font-bold text-slate-500 dark:text-slate-400">Billed Work</span>
+              </div>
             </div>
           </div>
 
-          {loading ? (
+          {servicesLoading ? (
             <div className="space-y-3">
               {[1, 2, 3, 4, 5].map((i) => <Skeleton key={i} className="h-10 w-full" />)}
             </div>
           ) : services.length === 0 ? (
             <div className="flex h-24 items-center justify-center">
-              <p className="text-sm text-slate-400">No service data yet.</p>
+              <p className="text-sm text-slate-400">No billed services in {MONTH_NAMES[servicesMonth - 1]} {servicesYear}.</p>
             </div>
           ) : (
             <div className="space-y-3">
               {services.map((s, idx) => {
-                const barPct = Math.round((s.revenue / maxRevenue) * 100)
+                const total = s.total ?? s.revenue
+                const barPct = Math.round((total / maxServiceTotal) * 100)
                 return (
                   <div key={s.description} className="flex items-center gap-4">
                     <span className="w-5 shrink-0 text-right text-xs font-bold text-slate-400">{idx + 1}</span>
                     <div className="min-w-0 flex-1">
-                      <div className="mb-1 flex items-center justify-between">
+                      <div className="mb-1 flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
                         <p className="truncate text-sm font-semibold text-slate-800 dark:text-slate-200">{s.description}</p>
-                        <div className="ml-4 flex shrink-0 items-center gap-3 text-xs">
+                        <div className="ml-auto flex shrink-0 items-center gap-3 text-xs">
                           <span className="text-slate-400">{fmtCount(s.count)}×</span>
-                          <span className="font-bold text-slate-900 dark:text-white">{fmtMoney(s.revenue)}</span>
+                          <span className="text-slate-500 dark:text-slate-400">Taxable {fmtMoney(s.revenue)}</span>
+                          <span className="text-slate-500 dark:text-slate-400">GST {fmtMoney(s.gst)}</span>
+                          <span className="font-bold text-slate-900 dark:text-white">Total {fmtMoney(total)}</span>
                         </div>
                       </div>
                       <div className="h-1.5 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">

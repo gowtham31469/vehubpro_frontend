@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { BadgeCheck, CircleDollarSign, Users, WalletCards } from 'lucide-react'
+import { BadgeCheck, Package, Users, WalletCards, Wrench } from 'lucide-react'
 import AdminShell from '../components/AdminShell'
 import { useTenantBranding } from '../context/TenantBrandingContext.jsx'
 import { hexToRgba } from '../utils/themeColors'
@@ -134,12 +134,13 @@ export default function AdminDashboard() {
           </div>
 
           {/* ── KPI cards ── */}
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
             {[
-              { label: 'Total Customers',      value: fmtCount(summary?.total_customers),      Icon: Users          },
-              { label: 'Active Job Cards',     value: fmtCount(summary?.active_jobs),          Icon: WalletCards    },
-              { label: 'Revenue This Month',   value: fmtMoney(summary?.revenue_this_month),   Icon: CircleDollarSign },
-              { label: 'Completed This Month', value: fmtCount(summary?.completed_this_month), Icon: BadgeCheck     },
+              { label: 'Total Customers',      value: fmtCount(summary?.total_customers),          Icon: Users       },
+              { label: 'Active Job Cards',     value: fmtCount(summary?.active_jobs),              Icon: WalletCards },
+              { label: 'Labour Revenue',       value: fmtMoney(summary?.labour_revenue_this_month), Icon: Wrench      },
+              { label: 'Parts Revenue',        value: fmtMoney(summary?.part_revenue_this_month),   Icon: Package     },
+              { label: 'Completed This Month', value: fmtCount(summary?.completed_this_month),      Icon: BadgeCheck  },
             ].map(({ label, value, Icon }) => (
               <div key={label} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm backdrop-blur-sm dark:border-slate-800/60 dark:bg-slate-900/40">
                 <div className="mb-4 flex items-center justify-between">
