@@ -9,6 +9,7 @@ export function TenantBrandingProvider({ children }) {
   const [branding, setBranding] = useState(() => getStoredBranding())
   const [subdomain] = useState(() => getSubdomain())
   const [tenantError, setTenantError] = useState(null)
+  const [tenantErrorCode, setTenantErrorCode] = useState(null)
 
   const [themeMode, setThemeModeState] = useState(() => localStorage.getItem('theme_mode') || 'system')
 
@@ -55,10 +56,12 @@ export function TenantBrandingProvider({ children }) {
         if (!cancelled) {
           setBranding(data)
           setTenantError(null)
+          setTenantErrorCode(null)
         }
       } catch (error) {
         if (!cancelled) {
           setTenantError(error.message || 'Tenant not found')
+          setTenantErrorCode(error.code || null)
         }
       }
     })()
@@ -98,13 +101,14 @@ export function TenantBrandingProvider({ children }) {
       tenantName: branding?.business_name || '',
       subdomain,
       tenantError,
+      tenantErrorCode,
       theme,
       themeMode,
       setThemeMode,
       refresh,
       setBranding,
     }),
-    [branding, subdomain, tenantError, theme, themeMode, setThemeMode, refresh],
+    [branding, subdomain, tenantError, tenantErrorCode, theme, themeMode, setThemeMode, refresh],
   )
 
   return <TenantBrandingContext.Provider value={value}>{children}</TenantBrandingContext.Provider>
@@ -121,6 +125,7 @@ export function useTenantBranding() {
       tenantName: b?.business_name || '',
       subdomain: getSubdomain(),
       tenantError: null,
+      tenantErrorCode: null,
       theme: {
         accent: primary,
         accentSoft: hexToRgba(primary, 0.12),

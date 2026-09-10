@@ -53,9 +53,13 @@ export async function fetchBrandingByToken(signal) {
 export async function fetchPublicTenantBranding(subdomain) {
   if (!API_BASE_URL) throw new Error('Missing VITE_API_BASE_URL')
   const response = await fetch(`${API_BASE_URL}/api/v1/public/tenants/${subdomain}/branding/`)
-  if (!response.ok) throw new Error('Could not fetch public tenant branding')
   let payload = null
   try { payload = await response.json() } catch { payload = null }
+  if (!response.ok) {
+    const err = new Error(payload?.error || payload?.message || 'Could not fetch public tenant branding')
+    err.code = payload?.code
+    throw err
+  }
   const data = (payload?.data ?? payload) || {}
   return saveBranding(data)
 }

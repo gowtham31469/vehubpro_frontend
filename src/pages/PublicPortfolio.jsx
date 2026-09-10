@@ -61,7 +61,7 @@ function BodyTypeIcon({ type, size = 26, className = '' }) {
 }
 
 export default function PublicPortfolio() {
-  const { theme, branding, brandingLogoUrl, tenantName, subdomain, tenantError } = useTenantBranding()
+  const { theme, branding, brandingLogoUrl, tenantName, subdomain, tenantError, tenantErrorCode } = useTenantBranding()
   const { showToast } = useToast()
 
   const [vehicles, setVehicles] = useState([])
@@ -128,6 +128,15 @@ export default function PublicPortfolio() {
     return rows.sort((a, b) => b.count - a.count || a.name.localeCompare(b.name))
   }, [allBrands, vehicles])
 
+  // Brands with live inventory get the full logo-card treatment; a large
+  // catalog otherwise reads as a wall of identical letter circles, so
+  // everything else collapses into a compact text chip list instead.
+  const popularBrands = useMemo(() => brandCounts.filter((b) => b.count > 0), [brandCounts])
+  const otherBrands = useMemo(
+    () => brandCounts.filter((b) => b.count === 0).sort((a, b) => a.name.localeCompare(b.name)),
+    [brandCounts]
+  )
+
   const scrollToId = (id) => {
     document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' })
   }
@@ -146,11 +155,16 @@ export default function PublicPortfolio() {
   }
 
   if (tenantError) {
+    const isPortfolioDisabled = tenantErrorCode === 'PORTFOLIO_MODULE_NOT_ENABLED'
     return (
       <div className="flex min-h-screen items-center justify-center bg-[#0B0B0B] px-4 text-center text-white">
         <div>
-          <h1 className="text-xl font-bold">Dealership not found</h1>
-          <p className="mt-2 text-sm text-[#9CA3AF]">Please check the URL and try again.</p>
+          <h1 className="text-xl font-bold">{isPortfolioDisabled ? 'Portfolio Not Available' : 'Dealership not found'}</h1>
+          <p className="mt-2 text-sm text-[#9CA3AF]">
+            {isPortfolioDisabled
+              ? 'This dealership does not have the Portfolio module enabled.'
+              : 'Please check the URL and try again.'}
+          </p>
         </div>
       </div>
     )
@@ -445,32 +459,55 @@ export default function PublicPortfolio() {
         <section id="brands" className="border-t border-[#1A1A1A] px-6 py-16">
           <div className="mx-auto max-w-[1240px]">
             <h2 className="text-center text-2xl font-extrabold uppercase tracking-tight text-white md:text-3xl">Explore Popular Brands</h2>
-            <div className="mt-10 flex flex-wrap items-center justify-center gap-x-12 gap-y-8">
-              {brandCounts.map((b) => (
-                <Link
-                  key={b.name}
-                  to={`/portfolio/inventory?brand=${encodeURIComponent(b.name)}`}
-                  className="group flex flex-col items-center gap-2.5 text-center"
-                >
-                  {b.logoUrl ? (
-                    <span className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-full bg-white p-2 transition group-hover:scale-105">
-                      <img src={b.logoUrl} alt={b.name} className="h-full w-full object-contain" />
+
+            {popularBrands.length > 0 ? (
+              <div className="mt-10 flex flex-wrap items-center justify-center gap-x-12 gap-y-8">
+                {popularBrands.map((b) => (
+                  <Link
+                    key={b.name}
+                    to={`/portfolio/inventory?brand=${encodeURIComponent(b.name)}`}
+                    className="group flex flex-col items-center gap-2.5 text-center"
+                  >
+                    {b.logoUrl ? (
+                      <span className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-full bg-white p-2 transition group-hover:scale-105">
+                        <img src={b.logoUrl} alt={b.name} className="h-full w-full object-contain" />
+                      </span>
+                    ) : (
+                      <span
+                        className="flex h-14 w-14 items-center justify-center rounded-full text-base font-bold transition group-hover:scale-105"
+                        style={{ backgroundColor: '#1A1A1A', color: '#9CA3AF' }}
+                      >
+                        {b.name.slice(0, 1).toUpperCase()}
+                      </span>
+                    )}
+                    <span className="text-sm font-semibold text-white">{b.name}</span>
+                    <span className="text-xs font-semibold text-[#6B7280]">
+                      {b.count} {b.count === 1 ? 'car' : 'cars'}
                     </span>
-                  ) : (
-                    <span
-                      className="flex h-14 w-14 items-center justify-center rounded-full text-base font-bold transition group-hover:scale-105"
-                      style={{ backgroundColor: '#1A1A1A', color: '#9CA3AF' }}
+                  </Link>
+                ))}
+              </div>
+            ) : (
+              <p className="mt-6 text-center text-sm text-[#6B7280]">No listings yet — check back soon.</p>
+            )}
+
+            {otherBrands.length > 0 ? (
+              <div className="mx-auto mt-12 max-w-3xl border-t border-[#1A1A1A] pt-8 text-center">
+                <p className="text-xs font-bold uppercase tracking-wide text-[#6B7280]">Also dealing in</p>
+                <div className="mt-4 flex flex-wrap justify-center gap-2">
+                  {otherBrands.map((b) => (
+                    <Link
+                      key={b.name}
+                      to={`/portfolio/inventory?brand=${encodeURIComponent(b.name)}`}
+                      className="rounded-full border border-[#262626] px-3 py-1.5 text-xs font-semibold text-[#9CA3AF] transition hover:border-[#3A3A3A] hover:text-white"
                     >
-                      {b.name.slice(0, 1).toUpperCase()}
-                    </span>
-                  )}
-                  <span className="text-sm font-semibold text-white">{b.name}</span>
-                  <span className="text-xs font-semibold text-[#6B7280]">
-                    {b.count} {b.count === 1 ? 'car' : 'cars'}
-                  </span>
-                </Link>
-              ))}
-            </div>
+                      {b.name}
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+
             <div className="mt-8 flex justify-center">
               <Link
                 to="/portfolio/inventory"

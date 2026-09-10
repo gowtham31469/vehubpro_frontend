@@ -36,7 +36,7 @@ const emptyFilters = {
 }
 
 export default function PublicInventoryListing() {
-  const { theme, brandingLogoUrl, tenantName, subdomain, tenantError } = useTenantBranding()
+  const { theme, brandingLogoUrl, tenantName, subdomain, tenantError, tenantErrorCode } = useTenantBranding()
   const { showToast } = useToast()
 
   const [searchParams] = useSearchParams()
@@ -127,9 +127,10 @@ export default function PublicInventoryListing() {
   }
 
   if (tenantError) {
+    const isPortfolioDisabled = tenantErrorCode === 'PORTFOLIO_MODULE_NOT_ENABLED'
     return (
       <div className="flex min-h-screen items-center justify-center bg-[#0B0B0B] px-6 text-center text-[#9CA3AF]">
-        <p>This dealership page could not be found.</p>
+        <p>{isPortfolioDisabled ? 'This dealership does not have the Portfolio module enabled.' : 'This dealership page could not be found.'}</p>
       </div>
     )
   }

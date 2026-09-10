@@ -4,7 +4,7 @@ import { useTenantBranding } from '../context/TenantBrandingContext.jsx'
 import { useToast } from '../context/ToastContext.jsx'
 
 export default function PublicContact() {
-  const { theme, branding, brandingLogoUrl, tenantName, tenantError } = useTenantBranding()
+  const { theme, branding, brandingLogoUrl, tenantName, tenantError, tenantErrorCode } = useTenantBranding()
   const { showToast } = useToast()
 
   const handleEnquireClick = () => {
@@ -12,11 +12,16 @@ export default function PublicContact() {
   }
 
   if (tenantError) {
+    const isPortfolioDisabled = tenantErrorCode === 'PORTFOLIO_MODULE_NOT_ENABLED'
     return (
       <div className="flex min-h-screen items-center justify-center bg-[#0B0B0B] px-4 text-center text-white">
         <div>
-          <h1 className="text-xl font-bold">Dealership not found</h1>
-          <p className="mt-2 text-sm text-[#9CA3AF]">Please check the URL and try again.</p>
+          <h1 className="text-xl font-bold">{isPortfolioDisabled ? 'Portfolio Not Available' : 'Dealership not found'}</h1>
+          <p className="mt-2 text-sm text-[#9CA3AF]">
+            {isPortfolioDisabled
+              ? 'This dealership does not have the Portfolio module enabled.'
+              : 'Please check the URL and try again.'}
+          </p>
         </div>
       </div>
     )
