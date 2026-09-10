@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Car, Gauge, Fuel, Cog, Search, ShieldCheck, Sparkles, Heart, ChevronRight } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { Car, Gauge, Fuel, Cog, Search, ShieldCheck, Sparkles, ChevronRight } from 'lucide-react'
 import { useTenantBranding } from '../context/TenantBrandingContext.jsx'
 import { useToast } from '../context/ToastContext.jsx'
-import { fetchPublicInventoryVehicles } from '../utils/publicPortfolio'
+import { fetchPublicInventoryVehicles, fetchPublicVehicleBrands } from '../utils/publicPortfolio'
 import heroFallbackImage from '../assets/images/hero-bmw-classic.png'
 import hatchbackIcon from '../assets/images/body-types/hatchback.png'
 import sedanIcon from '../assets/images/body-types/sedan.png'
@@ -10,14 +11,6 @@ import suvIcon from '../assets/images/body-types/suv.png'
 import muvIcon from '../assets/images/body-types/muv.png'
 import luxurySedanIcon from '../assets/images/body-types/luxury-sedan.png'
 import luxurySuvIcon from '../assets/images/body-types/luxury-suv.png'
-
-const PRICE_BUCKETS = [
-  { id: '', label: 'Any Price' },
-  { id: '0-500000', label: 'Under ₹5,00,000' },
-  { id: '500000-1000000', label: '₹5,00,000 - ₹10,00,000' },
-  { id: '1000000-2500000', label: '₹10,00,000 - ₹25,00,000' },
-  { id: '2500000-', label: 'Above ₹25,00,000' },
-]
 
 const TRUST_POINTS = [
   { icon: ShieldCheck, label: 'Verified Listings' },
@@ -68,65 +61,28 @@ function BodyTypeIcon({ type, size = 26, className = '' }) {
 }
 
 export default function PublicPortfolio() {
-  const { theme, brandingLogoUrl, tenantName, subdomain, tenantError } = useTenantBranding()
+  const { theme, branding, brandingLogoUrl, tenantName, subdomain, tenantError } = useTenantBranding()
   const { showToast } = useToast()
 
   const [vehicles, setVehicles] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [loadError, setLoadError] = useState('')
-
-  const [searchText, setSearchText] = useState('')
-  const [brandFilter, setBrandFilter] = useState('')
-  const [priceFilter, setPriceFilter] = useState('')
-  const [showAll, setShowAll] = useState(false)
+  const [allBrands, setAllBrands] = useState([])
 
   const [featuredTab, setFeaturedTab] = useState('best')
-  const [wishlist, setWishlist] = useState(() => new Set())
   const [selectedBodyType, setSelectedBodyType] = useState('')
   const [bodyTypeShowAll, setBodyTypeShowAll] = useState(false)
   const featuredScrollRef = useRef(null)
 
   useEffect(() => {
-    if (!subdomain) {
-      setLoading(false)
-      setLoadError('This page must be viewed from your dealership subdomain.')
-      return
-    }
+    if (!subdomain) return undefined
     let cancelled = false
-    setLoading(true)
     fetchPublicInventoryVehicles(subdomain)
       .then((data) => { if (!cancelled) setVehicles(Array.isArray(data) ? data : []) })
-      .catch((err) => { if (!cancelled) setLoadError(err.message || 'Could not load inventory.') })
-      .finally(() => { if (!cancelled) setLoading(false) })
+      .catch(() => { if (!cancelled) setVehicles([]) })
+    fetchPublicVehicleBrands(subdomain)
+      .then((data) => { if (!cancelled) setAllBrands(Array.isArray(data) ? data : []) })
+      .catch(() => { if (!cancelled) setAllBrands([]) })
     return () => { cancelled = true }
   }, [subdomain])
-
-  const brandOptions = useMemo(() => {
-    const names = new Set(vehicles.map((v) => v.brand_name).filter(Boolean))
-    return ['', ...Array.from(names).sort()]
-  }, [vehicles])
-
-  const filteredVehicles = useMemo(() => {
-    const q = searchText.trim().toLowerCase()
-    let rows = vehicles.filter((v) => {
-      const matchesSearch = !q ||
-        v.brand_name?.toLowerCase().includes(q) ||
-        v.vehicle_model_name?.toLowerCase().includes(q)
-      const matchesBrand = !brandFilter || v.brand_name === brandFilter
-      let matchesPrice = true
-      if (priceFilter) {
-        const [minStr, maxStr] = priceFilter.split('-')
-        const min = Number(minStr) || 0
-        const max = maxStr ? Number(maxStr) : Infinity
-        const price = Number(v.listing_price || 0)
-        matchesPrice = price >= min && price <= max
-      }
-      return matchesSearch && matchesBrand && matchesPrice
-    })
-    return rows
-  }, [vehicles, searchText, brandFilter, priceFilter])
-
-  const visibleVehicles = showAll ? filteredVehicles : filteredVehicles.slice(0, 4)
 
   const featuredVehicles = useMemo(() => {
     const rows = [...vehicles]
@@ -146,15 +102,31 @@ export default function PublicPortfolio() {
   const visibleBodyTypeVehicles = bodyTypeShowAll ? bodyTypeVehicles : bodyTypeVehicles.slice(0, 4)
 
   const brandCounts = useMemo(() => {
-    const map = new Map()
+    const countByName = new Map()
     vehicles.forEach((v) => {
       if (!v.brand_name) return
-      map.set(v.brand_name, (map.get(v.brand_name) || 0) + 1)
+      countByName.set(v.brand_name, (countByName.get(v.brand_name) || 0) + 1)
     })
-    return Array.from(map.entries())
-      .map(([name, count]) => ({ name, count }))
-      .sort((a, b) => b.count - a.count)
-  }, [vehicles])
+
+    // Every brand the tenant has created shows up here, even ones with zero
+    // current inventory — not just brands derived from existing listings.
+    const rows = allBrands.map((b) => ({
+      name: b.name,
+      logoUrl: b.logo_url || null,
+      count: countByName.get(b.name) || 0,
+    }))
+
+    // Any inventory brand not present in allBrands (e.g. brand archived after
+    // listing) still gets shown so counts aren't silently dropped.
+    countByName.forEach((count, name) => {
+      if (!rows.some((r) => r.name === name)) {
+        const fromVehicle = vehicles.find((v) => v.brand_name === name)
+        rows.push({ name, logoUrl: fromVehicle?.brand_logo_url || null, count })
+      }
+    })
+
+    return rows.sort((a, b) => b.count - a.count || a.name.localeCompare(b.name))
+  }, [allBrands, vehicles])
 
   const scrollToId = (id) => {
     document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' })
@@ -164,15 +136,6 @@ export default function PublicPortfolio() {
     showToast('info', `Contact ${tenantName || 'the dealership'} directly to enquire about this vehicle.`)
   }
 
-  const toggleWishlist = (id) => {
-    setWishlist((prev) => {
-      const next = new Set(prev)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
-      return next
-    })
-  }
-
   const handleSelectBodyType = (type) => {
     setSelectedBodyType(type)
     setBodyTypeShowAll(false)
@@ -180,11 +143,6 @@ export default function PublicPortfolio() {
 
   const scrollFeatured = (dir) => {
     featuredScrollRef.current?.scrollBy({ left: dir * 320, behavior: 'smooth' })
-  }
-
-  const handleBrandCardClick = (name) => {
-    setBrandFilter(name)
-    scrollToId('inventory')
   }
 
   if (tenantError) {
@@ -215,17 +173,9 @@ export default function PublicPortfolio() {
           </div>
           <nav className="hidden items-center gap-8 text-sm font-semibold text-[#9CA3AF] md:flex">
             <button type="button" onClick={() => scrollToId('top')} className="transition hover:text-white">Home</button>
-            <button type="button" onClick={() => scrollToId('inventory')} className="transition hover:text-white">Inventory</button>
-            <button type="button" onClick={() => scrollToId('brands')} className="transition hover:text-white">Brands</button>
-            <button type="button" onClick={() => scrollToId('cta')} className="transition hover:text-white">Contact</button>
+            <Link to="/portfolio/inventory" className="transition hover:text-white">Inventory</Link>
+            <Link to="/portfolio/contact" className="transition hover:text-white">Contact</Link>
           </nav>
-          <a
-            href="/admin"
-            className="rounded-xl px-5 py-2.5 text-sm font-bold text-white shadow transition-opacity hover:opacity-90"
-            style={{ backgroundColor: theme.accent }}
-          >
-            Sign In
-          </a>
         </div>
       </header>
 
@@ -246,21 +196,19 @@ export default function PublicPortfolio() {
               Explore {tenantName || 'our'} curated selection of quality vehicles, each ready for its next owner.
             </p>
             <div className="mt-7 flex flex-wrap gap-3">
-              <button
-                type="button"
-                onClick={() => scrollToId('inventory')}
+              <Link
+                to="/portfolio/inventory"
                 className="rounded-xl px-6 py-3 text-sm font-bold text-white shadow transition-opacity hover:opacity-90"
                 style={{ backgroundColor: theme.accent }}
               >
                 View Inventory
-              </button>
-              <button
-                type="button"
-                onClick={() => scrollToId('cta')}
+              </Link>
+              <Link
+                to="/portfolio/contact"
                 className="rounded-xl border border-[#3A3A3A] bg-transparent px-6 py-3 text-sm font-bold text-white transition hover:bg-[#141414]"
               >
                 Sell Your Car
-              </button>
+              </Link>
             </div>
             <div className="mt-10 grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-4">
               {TRUST_POINTS.map(({ icon: Icon, label }) => (
@@ -277,48 +225,6 @@ export default function PublicPortfolio() {
               alt="Featured vehicle"
               className="h-full w-full object-cover"
             />
-          </div>
-        </div>
-
-        {/* Floating filter bar */}
-        <div className="mx-auto max-w-[1000px] px-6">
-          <div className="grid grid-cols-1 items-end gap-4 rounded-[20px] border border-[#262626] bg-[#141414] p-5 shadow-2xl sm:grid-cols-4">
-            <div className="sm:col-span-2">
-              <label className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-[#6B7280]">Make &amp; Model</label>
-              <div className="relative">
-                <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#6B7280]" />
-                <input
-                  value={searchText}
-                  onChange={(e) => setSearchText(e.target.value)}
-                  placeholder="Search brands…"
-                  className="w-full rounded-xl border border-[#262626] bg-[#1A1A1A] py-2.5 pl-9 pr-3 text-sm text-white outline-none placeholder:text-[#6B7280] focus:border-[#3A3A3A]"
-                />
-              </div>
-            </div>
-            <div>
-              <label className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-[#6B7280]">Brand</label>
-              <select
-                value={brandFilter}
-                onChange={(e) => setBrandFilter(e.target.value)}
-                className="w-full rounded-xl border border-[#262626] bg-[#1A1A1A] px-3 py-2.5 text-sm text-white outline-none focus:border-[#3A3A3A]"
-              >
-                {brandOptions.map((b) => (
-                  <option key={b || 'all'} value={b}>{b || 'All Brands'}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-[#6B7280]">Price Range</label>
-              <select
-                value={priceFilter}
-                onChange={(e) => setPriceFilter(e.target.value)}
-                className="w-full rounded-xl border border-[#262626] bg-[#1A1A1A] px-3 py-2.5 text-sm text-white outline-none focus:border-[#3A3A3A]"
-              >
-                {PRICE_BUCKETS.map((p) => (
-                  <option key={p.id} value={p.id}>{p.label}</option>
-                ))}
-              </select>
-            </div>
           </div>
         </div>
       </section>
@@ -373,14 +279,6 @@ export default function PublicPortfolio() {
                           New
                         </span>
                       ) : null}
-                      <button
-                        type="button"
-                        onClick={() => toggleWishlist(v.id)}
-                        className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full bg-white shadow"
-                        aria-label="Save to wishlist"
-                      >
-                        <Heart size={15} className={wishlist.has(v.id) ? 'fill-rose-500 text-rose-500' : 'text-[#6B7280]'} />
-                      </button>
                     </div>
                     <div className="p-4">
                       <p className="font-bold text-white">{v.year} {v.brand_name} {v.vehicle_model_name}</p>
@@ -424,13 +322,12 @@ export default function PublicPortfolio() {
             </div>
 
             <div className="mt-8 flex justify-center">
-              <button
-                type="button"
-                onClick={() => scrollToId('inventory')}
+              <Link
+                to="/portfolio/inventory"
                 className="rounded-xl border border-[#3A3A3A] px-6 py-3 text-sm font-bold text-white transition hover:bg-[#141414]"
               >
                 View all {tenantName || 'showroom'} cars
-              </button>
+              </Link>
             </div>
           </div>
         </section>
@@ -502,83 +399,6 @@ export default function PublicPortfolio() {
         </div>
       </section>
 
-      {/* Full inventory */}
-      <section id="inventory" className="border-t border-[#1A1A1A] px-6 py-16">
-        <div className="mx-auto max-w-[1240px]">
-          <div className="mb-8 flex flex-wrap items-end justify-between gap-3">
-            <div>
-              <h2 className="text-2xl font-extrabold uppercase tracking-tight text-white md:text-3xl">Full Inventory</h2>
-              <p className="mt-1 text-sm text-[#9CA3AF]">Results update instantly as you filter above</p>
-            </div>
-            {filteredVehicles.length > 4 ? (
-              <button
-                type="button"
-                onClick={() => setShowAll((v) => !v)}
-                className="text-sm font-bold hover:underline"
-                style={{ color: theme.accent }}
-              >
-                {showAll ? 'Show Less' : `View All (${filteredVehicles.length})`}
-              </button>
-            ) : null}
-          </div>
-
-          {loading ? (
-            <p className="py-16 text-center text-[#6B7280]">Loading inventory…</p>
-          ) : loadError ? (
-            <p className="py-16 text-center text-rose-400">{loadError}</p>
-          ) : filteredVehicles.length === 0 ? (
-            <p className="py-16 text-center text-[#6B7280]">No vehicles match your search right now.</p>
-          ) : (
-            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
-              {visibleVehicles.map((v) => (
-                <div key={v.id} className="overflow-hidden rounded-2xl border border-[#262626] bg-[#141414]">
-                  <div className="relative h-40 bg-[#0B0B0B]">
-                    {v.photo_urls?.[0] ? (
-                      <img src={v.photo_urls[0]} alt={`${v.brand_name} ${v.vehicle_model_name}`} className="h-full w-full object-cover" />
-                    ) : (
-                      <div className="flex h-full items-center justify-center">
-                        <Car size={36} className="text-[#3A3A3A]" />
-                      </div>
-                    )}
-                    {isNewListing(v.created_at) ? (
-                      <span className="absolute right-2 top-2 rounded-full bg-white px-2 py-0.5 text-[11px] font-bold text-[#141414] shadow">
-                        New
-                      </span>
-                    ) : null}
-                  </div>
-                  <div className="p-4">
-                    <p className="font-bold text-white">{v.year} {v.brand_name} {v.vehicle_model_name}</p>
-                    <p className="mt-0.5 text-lg font-extrabold" style={{ color: theme.accent }}>{fmtMoney(v.listing_price)}</p>
-                    <div className="mt-3 grid grid-cols-3 gap-1.5 text-center text-[11px] text-[#9CA3AF]">
-                      <div className="flex flex-col items-center gap-1 rounded-lg bg-[#1A1A1A] py-2">
-                        <Gauge size={14} />
-                        {Number(v.mileage_km || 0).toLocaleString('en-IN')} km
-                      </div>
-                      <div className="flex flex-col items-center gap-1 rounded-lg bg-[#1A1A1A] py-2 capitalize">
-                        <Cog size={14} />
-                        {v.transmission}
-                      </div>
-                      <div className="flex flex-col items-center gap-1 rounded-lg bg-[#1A1A1A] py-2">
-                        <Fuel size={14} />
-                        {v.fuel_type_name}
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={handleContactClick}
-                      className="mt-4 w-full rounded-xl py-2 text-sm font-bold text-white transition hover:opacity-90"
-                      style={{ backgroundColor: theme.accent }}
-                    >
-                      View Details
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </section>
-
       {/* Promotional banner row */}
       <section className="border-t border-[#1A1A1A] px-6 py-16">
         <div className="mx-auto grid max-w-[1240px] grid-cols-1 gap-5 md:grid-cols-3">
@@ -586,14 +406,13 @@ export default function PublicPortfolio() {
             <p className="text-xs font-bold uppercase tracking-wide" style={{ color: theme.accent }}>Have a car to sell?</p>
             <h3 className="mt-2 text-xl font-extrabold text-white">Sell Your Car With Us</h3>
             <p className="mt-2 text-sm text-[#9CA3AF]">Get a fair valuation and a hassle-free sale, handled directly by {tenantName || 'our team'}.</p>
-            <button
-              type="button"
-              onClick={() => scrollToId('cta')}
-              className="mt-5 rounded-xl px-5 py-2.5 text-sm font-bold text-white transition-opacity hover:opacity-90"
+            <Link
+              to="/portfolio/contact"
+              className="mt-5 inline-block rounded-xl px-5 py-2.5 text-sm font-bold text-white transition-opacity hover:opacity-90"
               style={{ backgroundColor: theme.accent }}
             >
               Get Started
-            </button>
+            </Link>
           </div>
           <div className="rounded-2xl border border-[#262626] bg-[#141414] p-7">
             <p className="text-xs font-bold uppercase tracking-wide text-[#9CA3AF]">Questions about a listing?</p>
@@ -611,13 +430,12 @@ export default function PublicPortfolio() {
             <p className="text-xs font-bold uppercase tracking-wide text-[#9CA3AF]">{vehicles.length} vehicles listed</p>
             <h3 className="mt-2 text-xl font-extrabold text-white">See Everything In Stock</h3>
             <p className="mt-2 text-sm text-[#9CA3AF]">Browse the full, filterable inventory in one place.</p>
-            <button
-              type="button"
-              onClick={() => scrollToId('inventory')}
-              className="mt-5 rounded-xl border border-[#3A3A3A] px-5 py-2.5 text-sm font-bold text-white transition hover:bg-[#1A1A1A]"
+            <Link
+              to="/portfolio/inventory"
+              className="mt-5 inline-block rounded-xl border border-[#3A3A3A] px-5 py-2.5 text-sm font-bold text-white transition hover:bg-[#1A1A1A]"
             >
               View Inventory
-            </button>
+            </Link>
           </div>
         </div>
       </section>
@@ -629,44 +447,44 @@ export default function PublicPortfolio() {
             <h2 className="text-center text-2xl font-extrabold uppercase tracking-tight text-white md:text-3xl">Explore Popular Brands</h2>
             <div className="mt-10 flex flex-wrap items-center justify-center gap-x-12 gap-y-8">
               {brandCounts.map((b) => (
-                <button
+                <Link
                   key={b.name}
-                  type="button"
-                  onClick={() => handleBrandCardClick(b.name)}
+                  to={`/portfolio/inventory?brand=${encodeURIComponent(b.name)}`}
                   className="group flex flex-col items-center gap-2.5 text-center"
                 >
-                  <span
-                    className="flex h-14 w-14 items-center justify-center rounded-full text-base font-bold transition group-hover:scale-105"
-                    style={
-                      brandFilter === b.name
-                        ? { backgroundColor: theme.accent, color: '#fff' }
-                        : { backgroundColor: '#1A1A1A', color: '#9CA3AF' }
-                    }
-                  >
-                    {b.name.slice(0, 1).toUpperCase()}
-                  </span>
+                  {b.logoUrl ? (
+                    <span className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-full bg-white p-2 transition group-hover:scale-105">
+                      <img src={b.logoUrl} alt={b.name} className="h-full w-full object-contain" />
+                    </span>
+                  ) : (
+                    <span
+                      className="flex h-14 w-14 items-center justify-center rounded-full text-base font-bold transition group-hover:scale-105"
+                      style={{ backgroundColor: '#1A1A1A', color: '#9CA3AF' }}
+                    >
+                      {b.name.slice(0, 1).toUpperCase()}
+                    </span>
+                  )}
                   <span className="text-sm font-semibold text-white">{b.name}</span>
                   <span className="text-xs font-semibold text-[#6B7280]">
                     {b.count} {b.count === 1 ? 'car' : 'cars'}
                   </span>
-                </button>
+                </Link>
               ))}
             </div>
             <div className="mt-8 flex justify-center">
-              <button
-                type="button"
-                onClick={() => { setBrandFilter(''); scrollToId('inventory') }}
+              <Link
+                to="/portfolio/inventory"
                 className="rounded-xl border border-[#3A3A3A] px-6 py-3 text-sm font-bold text-white transition hover:bg-[#141414]"
               >
                 View all cars
-              </button>
+              </Link>
             </div>
           </div>
         </section>
       ) : null}
 
       {/* CTA */}
-      <section id="cta" className="px-6 py-16">
+      <section className="px-6 py-16">
         <div
           className="relative mx-auto max-w-[1240px] overflow-hidden rounded-3xl px-8 py-14 text-center text-white"
           style={{ backgroundColor: theme.accent }}
@@ -677,19 +495,12 @@ export default function PublicPortfolio() {
             Reach out to {tenantName || 'our team'} — we're happy to help you find the right vehicle.
           </p>
           <div className="mt-6 flex flex-wrap justify-center gap-3">
-            <button
-              type="button"
-              onClick={handleContactClick}
+            <Link
+              to="/portfolio/contact"
               className="rounded-xl bg-white px-6 py-3 text-sm font-bold text-[#141414] shadow hover:bg-slate-100"
             >
               Contact Us
-            </button>
-            <a
-              href="/admin"
-              className="rounded-xl border border-white/60 px-6 py-3 text-sm font-bold text-white hover:bg-white/10"
-            >
-              Dealer Sign In
-            </a>
+            </Link>
           </div>
         </div>
       </section>
@@ -717,13 +528,19 @@ export default function PublicPortfolio() {
                 ) : null}
                 <span className="text-lg font-extrabold uppercase tracking-tight text-white">{tenantName || 'Showroom'}</span>
               </div>
-              <p className="mt-2 max-w-xs text-sm text-[#6B7280]">Quality vehicles, straightforward buying — browse the full inventory or get in touch.</p>
+              <p className="mt-2 max-w-xs text-sm text-[#6B7280]">
+                {branding?.address || 'Quality vehicles, straightforward buying — browse the full inventory or get in touch.'}
+              </p>
+              {branding?.phone ? (
+                <a href={`tel:${branding.phone}`} className="mt-1 inline-block text-sm text-[#9CA3AF] hover:text-white">
+                  {branding.phone}
+                </a>
+              ) : null}
             </div>
             <div className="flex flex-wrap justify-center gap-x-8 gap-y-2 text-sm text-[#9CA3AF] sm:justify-end">
               <button type="button" onClick={() => scrollToId('top')} className="hover:text-white">Home</button>
-              <button type="button" onClick={() => scrollToId('inventory')} className="hover:text-white">Inventory</button>
-              <button type="button" onClick={() => scrollToId('brands')} className="hover:text-white">Brands</button>
-              <button type="button" onClick={() => scrollToId('cta')} className="hover:text-white">Contact</button>
+              <Link to="/portfolio/inventory" className="hover:text-white">Inventory</Link>
+              <Link to="/portfolio/contact" className="hover:text-white">Contact</Link>
             </div>
           </div>
           <div className="mt-8 border-t border-[#1A1A1A] pt-6 text-center text-xs text-[#6B7280]">

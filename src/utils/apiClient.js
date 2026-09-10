@@ -153,6 +153,50 @@ export async function apiFetch(path, options = {}, { retryOnAuthError = true } =
   return { response, payload, text }
 }
 
+/**
+ * Like apiFetch, but for binary/file responses (e.g. a CSV report export) —
+ * reads the body as a Blob instead of JSON text, so a large streamed response
+ * is handed to the browser's own (disk-backed) blob storage rather than held
+ * as one big JS string. Same 401-refresh-and-retry behavior as apiFetch.
+ */
+export async function apiFetchBlob(path, options = {}) {
+  if (!API_BASE_URL) {
+    throw new Error('Missing VITE_API_BASE_URL in frontend .env file.')
+  }
+
+  const headers = { ...(options.headers || {}) }
+  const access = getAccessToken()
+  if (access) headers.Authorization = `Bearer ${access}`
+
+  let response = await fetch(`${API_BASE_URL}${path}`, { ...options, headers })
+
+  if (response.status === 401) {
+    try {
+      const newAccess = await refreshAccessToken()
+      response = await fetch(`${API_BASE_URL}${path}`, {
+        ...options,
+        headers: { ...(options.headers || {}), Authorization: `Bearer ${newAccess}` },
+      })
+    } catch {
+      clearSession()
+      throw new Error('SESSION_EXPIRED')
+    }
+  }
+
+  if (!response.ok) {
+    let message = `Request failed (${response.status}).`
+    try {
+      const payload = JSON.parse(await response.text())
+      message = extractApiError(payload, message)
+    } catch {
+      // Response wasn't JSON (or already consumed) — fall back to the generic message.
+    }
+    throw new Error(message)
+  }
+
+  return response.blob()
+}
+
 export function unwrapData(payload) {
   return payload?.data ?? payload
 }

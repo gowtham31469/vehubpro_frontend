@@ -13,6 +13,8 @@ import {
   updateInventoryVehicle,
 } from '../utils/inventoryVehicles'
 
+const BODY_TYPE_CODES = new Set(['hatchback', 'sedan', 'suv', 'muv', 'luxury_sedan', 'luxury_suv'])
+
 function emptyForm(y0) {
   return {
     vehicle_type: '',
@@ -149,7 +151,15 @@ export default function AdminInventoryVehicleForm() {
 
   const brandOptions = brands.map((b) => ({ id: b.id, name: b.name }))
   const modelOptions = modelsForBrand.map((m) => ({ id: m.id, name: m.name }))
-  const vehicleTypeOptions = vehicleTypes.map((t) => ({ id: t.id, name: t.name }))
+  // Restricted to the seeded body-type codes (see
+  // backend/apps/platform/vehicles/migrations/0011_seed_body_type_vehicle_types.py)
+  // so every listing lands in one of the buckets the public portfolio's
+  // "Browse by Body Type" section actually filters by — the shared VehicleType
+  // master also holds generic, non-body types (e.g. "Car", "Bus") used by the
+  // service-vehicle form, which would never match any body-type bucket.
+  const vehicleTypeOptions = vehicleTypes
+    .filter((t) => BODY_TYPE_CODES.has(t.code))
+    .map((t) => ({ id: t.id, name: t.name }))
   const fuelTypeOptions = fuelTypes.map((f) => ({ id: f.id, name: f.name }))
 
   const toggleFeature = (featureId) => {
@@ -188,7 +198,7 @@ export default function AdminInventoryVehicleForm() {
     setFormError('')
 
     if (!form.vehicle_type) {
-      setFormError('Vehicle type is required.')
+      setFormError('Body type is required.')
       setSaving(false)
       return
     }
@@ -280,13 +290,13 @@ export default function AdminInventoryVehicleForm() {
           <SectionCard step={1} title="Basic Information">
             <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
               <div>
-                <label className={labelCls}>Vehicle Type <span className="text-rose-500">*</span></label>
+                <label className={labelCls}>Body Type <span className="text-rose-500">*</span></label>
                 <SearchableSelect
                   value={form.vehicle_type}
                   options={vehicleTypeOptions}
                   onChange={(v) => setForm((p) => ({ ...p, vehicle_type: v }))}
-                  placeholder="Select vehicle type"
-                  searchPlaceholder="Search vehicle types…"
+                  placeholder="Select body type"
+                  searchPlaceholder="Search body types…"
                   accent={theme.accent}
                   accentSoft={theme.accentSoft}
                 />

@@ -22,7 +22,7 @@ import {
   updateInventoryFeature,
 } from '../utils/inventoryVehicles'
 
-const emptyBrand = { name: '', is_active: true }
+const emptyBrand = { name: '', is_active: true, logo_url: null, logo_file: null }
 const emptyModel = { brand: '', vehicle_type: '', name: '', is_active: true }
 const emptyFeature = { name: '', is_active: true }
 
@@ -43,6 +43,17 @@ export default function AdminConfiguration() {
   const [brandSaving, setBrandSaving] = useState(false)
   const [brandDelete, setBrandDelete] = useState(null)
   const [brandAll, setBrandAll] = useState([])
+  const [brandLogoPreview, setBrandLogoPreview] = useState(null)
+
+  useEffect(() => {
+    if (brandForm.logo_file) {
+      const url = URL.createObjectURL(brandForm.logo_file)
+      setBrandLogoPreview(url)
+      return () => URL.revokeObjectURL(url)
+    }
+    setBrandLogoPreview(brandForm.logo_url || null)
+    return undefined
+  }, [brandForm.logo_file, brandForm.logo_url])
 
   const loadBrands = useCallback(async (page = 1) => {
     setBrandLoading(true)
@@ -96,7 +107,7 @@ export default function AdminConfiguration() {
   }
   const openBrandEdit = (b) => {
     setBrandModalError('')
-    setBrandForm({ name: b.name || '', is_active: Boolean(b.is_active) })
+    setBrandForm({ name: b.name || '', is_active: Boolean(b.is_active), logo_url: b.logo_url || null, logo_file: null })
     setBrandModal({ type: 'edit', id: b.id })
   }
 
@@ -115,7 +126,14 @@ export default function AdminConfiguration() {
     }
     setBrandSaving(true)
     try {
-      const payload = { name, is_active: brandForm.is_active }
+      let payload = { name, is_active: brandForm.is_active }
+      if (brandForm.logo_file) {
+        const formData = new FormData()
+        formData.append('name', name)
+        formData.append('is_active', String(brandForm.is_active))
+        formData.append('logo_file', brandForm.logo_file)
+        payload = formData
+      }
       if (brandModal === 'create') {
         await createBrand(payload)
         showToast('success', 'Brand created.')
@@ -501,6 +519,7 @@ export default function AdminConfiguration() {
                   <table className="min-w-full">
                     <thead className="bg-slate-50 dark:bg-slate-800/50 text-left text-xs font-bold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">
                       <tr>
+                        <th className="px-6 py-4 w-16">Logo</th>
                         <th className="px-6 py-4">Name</th>
                         <th className="px-6 py-4 w-40">Actions</th>
                       </tr>
@@ -517,6 +536,15 @@ export default function AdminConfiguration() {
                       ) : (
                         filteredBrands.map((b) => (
                           <tr key={b.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40">
+                            <td className="px-6 py-3">
+                              {b.logo_url ? (
+                                <img src={b.logo_url} alt={b.name} className="h-9 w-9 rounded-full border border-slate-200 dark:border-slate-700 bg-white object-contain p-1" />
+                              ) : (
+                                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800 text-xs font-bold text-slate-400 dark:text-slate-500">
+                                  {(b.name || '?').slice(0, 1).toUpperCase()}
+                                </div>
+                              )}
+                            </td>
                             <td className="px-6 py-3 font-medium text-slate-900 dark:text-white">{b.name}</td>
 
                             <td className="px-6 py-3">
@@ -819,6 +847,25 @@ export default function AdminConfiguration() {
                   className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 px-3 py-2.5 text-sm outline-none focus:border-slate-400 dark:focus:border-slate-600 placeholder:text-slate-400 dark:placeholder:text-slate-600"
                   placeholder="Display name"
                 />
+              </div>
+
+              <div>
+                <label className="mb-1 block text-xs font-semibold text-slate-500 dark:text-slate-400">Logo</label>
+                <div className="flex items-center gap-3 rounded-xl border border-dashed border-slate-300 dark:border-slate-700 p-2">
+                  {brandLogoPreview ? (
+                    <img src={brandLogoPreview} alt="Preview" className="h-12 w-12 shrink-0 rounded-full border border-slate-200 dark:border-slate-700 bg-white object-contain p-1.5" />
+                  ) : (
+                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800 text-sm font-bold text-slate-400 dark:text-slate-500">
+                      {(brandForm.name || '?').slice(0, 1).toUpperCase()}
+                    </div>
+                  )}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => setBrandForm((p) => ({ ...p, logo_file: e.target.files[0] || null }))}
+                    className="w-full text-sm text-slate-500 dark:text-slate-400 file:mr-4 file:rounded-xl file:border-0 file:bg-slate-100 dark:file:bg-slate-800 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-slate-700 dark:file:text-slate-200 hover:file:bg-slate-200 dark:hover:file:bg-slate-700 focus:outline-none"
+                  />
+                </div>
               </div>
 
               <div className="flex justify-end gap-2 pt-2">

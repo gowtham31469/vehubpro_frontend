@@ -29,27 +29,33 @@ export async function fetchBrands({ page = 1, pageSize = 10, isArchived = false,
 }
 
 export async function createBrand(payload) {
-  return parseResponse(
-    '/api/v1/vehicles/brands/',
-    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) },
-    'Failed to create brand.',
-  )
+  const isFormData = payload instanceof FormData
+  const options = {
+    method: 'POST',
+    body: isFormData ? payload : JSON.stringify(payload),
+    ...(isFormData ? {} : { headers: { 'Content-Type': 'application/json' } }),
+  }
+  return parseResponse('/api/v1/vehicles/brands/', options, 'Failed to create brand.')
 }
 
 export async function updateBrand(brandId, payload) {
-  return parseResponse(
-    `/api/v1/vehicles/brands/${brandId}/`,
-    { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) },
-    'Failed to update brand.',
-  )
+  const isFormData = payload instanceof FormData
+  const options = {
+    method: 'PUT',
+    body: isFormData ? payload : JSON.stringify(payload),
+    ...(isFormData ? {} : { headers: { 'Content-Type': 'application/json' } }),
+  }
+  return parseResponse(`/api/v1/vehicles/brands/${brandId}/`, options, 'Failed to update brand.')
 }
 
 export async function patchBrand(brandId, payload) {
-  return parseResponse(
-    `/api/v1/vehicles/brands/${brandId}/`,
-    { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) },
-    'Failed to update brand.',
-  )
+  const isFormData = payload instanceof FormData
+  const options = {
+    method: 'PATCH',
+    body: isFormData ? payload : JSON.stringify(payload),
+    ...(isFormData ? {} : { headers: { 'Content-Type': 'application/json' } }),
+  }
+  return parseResponse(`/api/v1/vehicles/brands/${brandId}/`, options, 'Failed to update brand.')
 }
 
 export async function deleteBrand(brandId) {

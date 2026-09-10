@@ -70,6 +70,11 @@ const SUBMODULE_ROUTE_MAP = {
   // Insights
   'insights':            '/admin/insights',
   'insight':             '/admin/insights',
+
+  // Reports
+  'reports':             '/admin/reports',
+  'service_reports':     '/admin/reports',
+  'service-reports':     '/admin/reports',
   // Dashboard / Overview
   'overview':            '/admin/dashboard',
   'analytics':           '/admin/dashboard',
