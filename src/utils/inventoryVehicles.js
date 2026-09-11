@@ -65,13 +65,14 @@ export async function deleteInventoryVehicle(id) {
 }
 
 /** Tenant-scoped key-feature master (managed under Configuration). */
-export async function fetchInventoryFeatures({ page = 1, pageSize = 100, isArchived = false, isActive } = {}) {
+export async function fetchInventoryFeatures({ page = 1, pageSize = 100, isArchived = false, isActive, search = '' } = {}) {
   const params = new URLSearchParams({
     page: String(page),
     page_size: String(pageSize),
     is_archive: String(Boolean(isArchived)),
   })
   if (isActive !== undefined) params.set('is_active', String(Boolean(isActive)))
+  if (search.trim()) params.set('search', search.trim())
   return parseResponse(`/api/v1/portfolio/inventory-features/?${params.toString()}`, { method: 'GET' }, 'Failed to fetch key features.')
 }
 

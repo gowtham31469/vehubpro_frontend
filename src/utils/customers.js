@@ -8,12 +8,13 @@ async function parseResponse(path, options, fallbackError) {
   return unwrapData(payload)
 }
 
-export async function fetchCustomers({ page = 1, pageSize = 10, isArchived = false } = {}) {
+export async function fetchCustomers({ page = 1, pageSize = 10, isArchived = false, search = '' } = {}) {
   const params = new URLSearchParams({
     page: String(page),
     page_size: String(pageSize),
     is_archive: String(Boolean(isArchived)),
   })
+  if (search.trim()) params.set('search', search.trim())
   return parseResponse(`/api/v1/customers/?${params.toString()}`, { method: 'GET' }, 'Failed to fetch customers.')
 }
 

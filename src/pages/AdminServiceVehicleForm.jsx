@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Check, ChevronDown, UserPlus } from 'lucide-react'
+import { Check, ChevronDown, Search, UserPlus } from 'lucide-react'
 import AdminShell from '../components/AdminShell'
 import AddCustomerDrawer from '../components/AddCustomerDrawer'
 import { useToast } from '../context/ToastContext.jsx'
@@ -92,8 +92,47 @@ function buildPayload(form) {
   }
 }
 
-function Dropdown({ label, required, displayValue, placeholder, dropdownKey, activeDropdown, setActiveDropdown, dropdownRef, children }) {
+/**
+ * Owns the live search query itself. Rendered only while the dropdown is
+ * open (see Dropdown below), so it mounts fresh — and its query starts
+ * blank again — every time the dropdown opens, with no reset effect needed.
+ */
+function DropdownPanel({ searchable, searchPlaceholder, children }) {
+  const [query, setQuery] = useState('')
+  return (
+    <div className="absolute left-0 right-0 z-[60] mt-2 max-h-72 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg backdrop-blur-md dark:border-slate-800 dark:bg-slate-900/90">
+      {searchable ? (
+        <div className="sticky top-0 border-b border-slate-100 bg-white p-2 dark:border-slate-800 dark:bg-slate-900">
+          <div className="relative">
+            <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500" />
+            <input
+              autoFocus
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder={searchPlaceholder || 'Search...'}
+              className="w-full rounded-lg border border-slate-200 bg-slate-50 py-1.5 pl-8 pr-2 text-sm text-slate-700 outline-none focus:border-slate-400 dark:border-slate-700 dark:bg-slate-950/50 dark:text-slate-100 dark:placeholder:text-slate-600"
+            />
+          </div>
+        </div>
+      ) : null}
+      <div className={searchable ? 'max-h-56 overflow-auto' : ''}>
+        {typeof children === 'function' ? children(query) : children}
+      </div>
+    </div>
+  )
+}
+
+/**
+ * `children` may be a plain node, or a function `(query) => node` — pass a
+ * function (and `searchable`) to get a built-in search box that filters
+ * whatever list the caller renders from the live query text.
+ */
+function Dropdown({
+  label, required, displayValue, placeholder, dropdownKey, activeDropdown, setActiveDropdown, dropdownRef,
+  disabled, searchable, searchPlaceholder, children,
+}) {
   const isOpen = activeDropdown === dropdownKey
+
   return (
     <div>
       <label className="mb-1 block text-xs font-semibold text-slate-500 dark:text-slate-400">
@@ -102,20 +141,27 @@ function Dropdown({ label, required, displayValue, placeholder, dropdownKey, act
       <div className="relative" ref={dropdownRef}>
         <button
           type="button"
-          onClick={() => setActiveDropdown((prev) => (prev === dropdownKey ? null : dropdownKey))}
-          className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 pr-9 text-left text-sm font-medium text-slate-700 outline-none transition hover:border-slate-400 dark:border-slate-800 dark:bg-slate-950/50 dark:text-slate-100 dark:hover:border-slate-700"
+          disabled={disabled}
+          onClick={() => !disabled && setActiveDropdown((prev) => (prev === dropdownKey ? null : dropdownKey))}
+          className={`w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 pr-9 text-left text-sm font-medium outline-none transition hover:border-slate-400 dark:border-slate-800 dark:bg-slate-950/50 dark:hover:border-slate-700 ${disabled ? 'cursor-not-allowed text-slate-400 opacity-60 dark:text-slate-600' : 'text-slate-700 dark:text-slate-100'}`}
         >
           {displayValue || placeholder}
         </button>
         <ChevronDown size={16} className={`pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 transition ${isOpen ? 'rotate-180' : ''}`} />
-        {isOpen ? (
-          <div className="absolute left-0 right-0 z-[60] mt-2 max-h-56 overflow-auto rounded-xl border border-slate-200 bg-white shadow-lg backdrop-blur-md dark:border-slate-800 dark:bg-slate-900/90">
+        {isOpen && !disabled ? (
+          <DropdownPanel searchable={searchable} searchPlaceholder={searchPlaceholder}>
             {children}
-          </div>
+          </DropdownPanel>
         ) : null}
       </div>
     </div>
   )
+}
+
+function filterByName(list, query, key = 'name') {
+  const q = query.trim().toLowerCase()
+  if (!q) return list
+  return list.filter((item) => item[key]?.toLowerCase().includes(q))
 }
 
 function DropdownItem({ selected, onClick, theme, children }) {
@@ -319,34 +365,44 @@ export default function AdminServiceVehicleForm() {
                       setActiveDropdown={setActiveDropdown}
                       dropdownRef={customerRef}
                       theme={theme}
+                      searchable
+                      searchPlaceholder="Search customers..."
                     >
-                      {/* Add new customer shortcut */}
-                      <button
-                        type="button"
-                        onClick={() => { setActiveDropdown(null); setCustomerDrawerOpen(true) }}
-                        className="flex w-full items-center gap-2 border-b border-slate-100 dark:border-slate-800 px-3 py-2.5 text-left text-sm font-semibold transition hover:bg-slate-50 dark:hover:bg-slate-800"
-                        style={{ color: theme.accent }}
-                      >
-                        <UserPlus size={14} />
-                        Add new customer
-                      </button>
-                      <DropdownItem
-                        selected={!form.customer}
-                        onClick={() => { setForm((p) => ({ ...p, customer: '' })); setActiveDropdown(null) }}
-                        theme={theme}
-                      >
-                        Select customer
-                      </DropdownItem>
-                      {customers.map((c) => (
-                        <DropdownItem
-                          key={c.id}
-                          selected={String(form.customer) === String(c.id)}
-                          onClick={() => { setForm((p) => ({ ...p, customer: String(c.id) })); setActiveDropdown(null) }}
-                          theme={theme}
-                        >
-                          {c.full_name}
-                        </DropdownItem>
-                      ))}
+                      {(query) => (
+                        <>
+                          {/* Add new customer shortcut */}
+                          <button
+                            type="button"
+                            onClick={() => { setActiveDropdown(null); setCustomerDrawerOpen(true) }}
+                            className="flex w-full items-center gap-2 border-b border-slate-100 dark:border-slate-800 px-3 py-2.5 text-left text-sm font-semibold transition hover:bg-slate-50 dark:hover:bg-slate-800"
+                            style={{ color: theme.accent }}
+                          >
+                            <UserPlus size={14} />
+                            Add new customer
+                          </button>
+                          <DropdownItem
+                            selected={!form.customer}
+                            onClick={() => { setForm((p) => ({ ...p, customer: '' })); setActiveDropdown(null) }}
+                            theme={theme}
+                          >
+                            Select customer
+                          </DropdownItem>
+                          {filterByName(customers, query, 'full_name').length === 0 ? (
+                            <p className="px-3 py-3 text-xs text-slate-400 dark:text-slate-500">No customers match.</p>
+                          ) : (
+                            filterByName(customers, query, 'full_name').map((c) => (
+                              <DropdownItem
+                                key={c.id}
+                                selected={String(form.customer) === String(c.id)}
+                                onClick={() => { setForm((p) => ({ ...p, customer: String(c.id) })); setActiveDropdown(null) }}
+                                theme={theme}
+                              >
+                                {c.full_name}
+                              </DropdownItem>
+                            ))
+                          )}
+                        </>
+                      )}
                     </Dropdown>
                   </div>
 
@@ -385,24 +441,34 @@ export default function AdminServiceVehicleForm() {
                       setActiveDropdown={setActiveDropdown}
                       dropdownRef={vehicleTypeRef}
                       theme={theme}
+                      searchable
+                      searchPlaceholder="Search vehicle types..."
                     >
-                      <DropdownItem
-                        selected={!form.vehicle_type}
-                        onClick={() => { setForm((p) => ({ ...p, vehicle_type: '' })); setActiveDropdown(null) }}
-                        theme={theme}
-                      >
-                        Select type
-                      </DropdownItem>
-                      {vehicleTypes.map((t) => (
-                        <DropdownItem
-                          key={t.id}
-                          selected={String(form.vehicle_type) === String(t.id)}
-                          onClick={() => { setForm((p) => ({ ...p, vehicle_type: String(t.id) })); setActiveDropdown(null) }}
-                          theme={theme}
-                        >
-                          {t.name}
-                        </DropdownItem>
-                      ))}
+                      {(query) => (
+                        <>
+                          <DropdownItem
+                            selected={!form.vehicle_type}
+                            onClick={() => { setForm((p) => ({ ...p, vehicle_type: '' })); setActiveDropdown(null) }}
+                            theme={theme}
+                          >
+                            Select type
+                          </DropdownItem>
+                          {filterByName(vehicleTypes, query).length === 0 ? (
+                            <p className="px-3 py-3 text-xs text-slate-400 dark:text-slate-500">No vehicle types match.</p>
+                          ) : (
+                            filterByName(vehicleTypes, query).map((t) => (
+                              <DropdownItem
+                                key={t.id}
+                                selected={String(form.vehicle_type) === String(t.id)}
+                                onClick={() => { setForm((p) => ({ ...p, vehicle_type: String(t.id) })); setActiveDropdown(null) }}
+                                theme={theme}
+                              >
+                                {t.name}
+                              </DropdownItem>
+                            ))
+                          )}
+                        </>
+                      )}
                     </Dropdown>
                   </div>
 
@@ -416,24 +482,34 @@ export default function AdminServiceVehicleForm() {
                       setActiveDropdown={setActiveDropdown}
                       dropdownRef={fuelTypeRef}
                       theme={theme}
+                      searchable
+                      searchPlaceholder="Search fuel types..."
                     >
-                      <DropdownItem
-                        selected={!form.fuel_type}
-                        onClick={() => { setForm((p) => ({ ...p, fuel_type: '' })); setActiveDropdown(null) }}
-                        theme={theme}
-                      >
-                        Select fuel type
-                      </DropdownItem>
-                      {fuelTypes.map((t) => (
-                        <DropdownItem
-                          key={t.id}
-                          selected={String(form.fuel_type) === String(t.id)}
-                          onClick={() => { setForm((p) => ({ ...p, fuel_type: String(t.id) })); setActiveDropdown(null) }}
-                          theme={theme}
-                        >
-                          {t.name}
-                        </DropdownItem>
-                      ))}
+                      {(query) => (
+                        <>
+                          <DropdownItem
+                            selected={!form.fuel_type}
+                            onClick={() => { setForm((p) => ({ ...p, fuel_type: '' })); setActiveDropdown(null) }}
+                            theme={theme}
+                          >
+                            Select fuel type
+                          </DropdownItem>
+                          {filterByName(fuelTypes, query).length === 0 ? (
+                            <p className="px-3 py-3 text-xs text-slate-400 dark:text-slate-500">No fuel types match.</p>
+                          ) : (
+                            filterByName(fuelTypes, query).map((t) => (
+                              <DropdownItem
+                                key={t.id}
+                                selected={String(form.fuel_type) === String(t.id)}
+                                onClick={() => { setForm((p) => ({ ...p, fuel_type: String(t.id) })); setActiveDropdown(null) }}
+                                theme={theme}
+                              >
+                                {t.name}
+                              </DropdownItem>
+                            ))
+                          )}
+                        </>
+                      )}
                     </Dropdown>
                   </div>
 
@@ -447,41 +523,53 @@ export default function AdminServiceVehicleForm() {
                       setActiveDropdown={setActiveDropdown}
                       dropdownRef={brandRef}
                       theme={theme}
+                      searchable
+                      searchPlaceholder="Search brands..."
                     >
-                      <DropdownItem
-                        selected={!form.brand}
-                        onClick={() => { setForm((p) => ({ ...p, brand: '', vehicle_model: '' })); setActiveDropdown(null) }}
-                        theme={theme}
-                      >
-                        Select brand
-                      </DropdownItem>
-                      {brands.map((b) => (
-                        <DropdownItem
-                          key={b.id}
-                          selected={String(form.brand) === String(b.id)}
-                          onClick={() => { setForm((p) => ({ ...p, brand: String(b.id), vehicle_model: '' })); setActiveDropdown(null) }}
-                          theme={theme}
-                        >
-                          {b.name}
-                        </DropdownItem>
-                      ))}
+                      {(query) => (
+                        <>
+                          <DropdownItem
+                            selected={!form.brand}
+                            onClick={() => { setForm((p) => ({ ...p, brand: '', vehicle_model: '' })); setActiveDropdown(null) }}
+                            theme={theme}
+                          >
+                            Select brand
+                          </DropdownItem>
+                          {filterByName(brands, query).length === 0 ? (
+                            <p className="px-3 py-3 text-xs text-slate-400 dark:text-slate-500">No brands match.</p>
+                          ) : (
+                            filterByName(brands, query).map((b) => (
+                              <DropdownItem
+                                key={b.id}
+                                selected={String(form.brand) === String(b.id)}
+                                onClick={() => { setForm((p) => ({ ...p, brand: String(b.id), vehicle_model: '' })); setActiveDropdown(null) }}
+                                theme={theme}
+                              >
+                                {b.name}
+                              </DropdownItem>
+                            ))
+                          )}
+                        </>
+                      )}
                     </Dropdown>
                   </div>
 
                   <div>
-                    <label className={labelCls}>Model <span className="text-rose-500">*</span></label>
-                    <div className="relative" ref={modelRef}>
-                      <button
-                        type="button"
-                        disabled={!form.brand}
-                        onClick={() => form.brand && setActiveDropdown((prev) => (prev === 'model' ? null : 'model'))}
-                        className={`w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 pr-9 text-left text-sm font-medium outline-none transition hover:border-slate-400 dark:border-slate-800 dark:bg-slate-950/50 dark:hover:border-slate-700 ${form.brand ? 'text-slate-700 dark:text-slate-100' : 'cursor-not-allowed text-slate-400 dark:text-slate-600 opacity-60'}`}
-                      >
-                        {form.brand ? (selectedModel?.name || 'Select model') : 'Select brand first'}
-                      </button>
-                      <ChevronDown size={16} className={`pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 transition ${activeDropdown === 'model' ? 'rotate-180' : ''}`} />
-                      {activeDropdown === 'model' && form.brand ? (
-                        <div className="absolute left-0 right-0 z-[60] mt-2 max-h-56 overflow-auto rounded-xl border border-slate-200 bg-white shadow-lg backdrop-blur-md dark:border-slate-800 dark:bg-slate-900/90">
+                    <Dropdown
+                      label="Model" required
+                      displayValue={selectedModel?.name}
+                      placeholder={form.brand ? 'Select model' : 'Select brand first'}
+                      dropdownKey="model"
+                      activeDropdown={activeDropdown}
+                      setActiveDropdown={setActiveDropdown}
+                      dropdownRef={modelRef}
+                      theme={theme}
+                      disabled={!form.brand}
+                      searchable
+                      searchPlaceholder="Search models..."
+                    >
+                      {(query) => (
+                        <>
                           <DropdownItem
                             selected={!form.vehicle_model}
                             onClick={() => { setForm((p) => ({ ...p, vehicle_model: '' })); setActiveDropdown(null) }}
@@ -489,19 +577,23 @@ export default function AdminServiceVehicleForm() {
                           >
                             Select model
                           </DropdownItem>
-                          {modelsForBrand.map((m) => (
-                            <DropdownItem
-                              key={m.id}
-                              selected={String(form.vehicle_model) === String(m.id)}
-                              onClick={() => { setForm((p) => ({ ...p, vehicle_model: String(m.id) })); setActiveDropdown(null) }}
-                              theme={theme}
-                            >
-                              {m.name}
-                            </DropdownItem>
-                          ))}
-                        </div>
-                      ) : null}
-                    </div>
+                          {filterByName(modelsForBrand, query).length === 0 ? (
+                            <p className="px-3 py-3 text-xs text-slate-400 dark:text-slate-500">No models match.</p>
+                          ) : (
+                            filterByName(modelsForBrand, query).map((m) => (
+                              <DropdownItem
+                                key={m.id}
+                                selected={String(form.vehicle_model) === String(m.id)}
+                                onClick={() => { setForm((p) => ({ ...p, vehicle_model: String(m.id) })); setActiveDropdown(null) }}
+                                theme={theme}
+                              >
+                                {m.name}
+                              </DropdownItem>
+                            ))
+                          )}
+                        </>
+                      )}
+                    </Dropdown>
                   </div>
 
                 </div>

@@ -202,13 +202,29 @@ function resolveServiceItemPk(row, items) {
 }
 
 /**
+ * Whether a line's price is GST-inclusive — inherited verbatim from the linked
+ * catalog item (never overridable per line); custom lines with no catalog
+ * match are always exclusive, matching pre-existing behavior for them.
+ */
+function isRowPriceInclusive(row, serviceItems) {
+  const pk = resolveServiceItemPk(row, serviceItems)
+  if (!pk) return false
+  const item = (serviceItems || []).find((s) => String(s.id) === pk)
+  return Boolean(item && item.price_type === 'inclusive')
+}
+
+/**
  * Effective GST % for one line: an explicit per-row override (row.gst_percentage)
- * always wins; otherwise falls back to the linked catalog item's rate, or null
- * if neither is set (rendered as "No catalog GST (0%)" in the breakdown).
+ * wins for GST-exclusive lines; otherwise falls back to the linked catalog
+ * item's rate, or null if neither is set (rendered as "No catalog GST (0%)" in
+ * the breakdown). GST-inclusive lines always use the catalog rate — overriding
+ * it wouldn't change the fixed customer-facing price, only corrupt the
+ * reverse-calculated taxable value.
  */
 function lineCatalogGstPercent(row, serviceItems) {
+  const inclusive = isRowPriceInclusive(row, serviceItems)
   const override = row.gst_percentage
-  if (override !== undefined && override !== null && String(override).trim() !== '') {
+  if (!inclusive && override !== undefined && override !== null && String(override).trim() !== '') {
     const overridden = Number(override)
     if (Number.isFinite(overridden)) return overridden
   }
@@ -218,6 +234,12 @@ function lineCatalogGstPercent(row, serviceItems) {
   if (!item) return null
   const g = Number(item.gst_percentage)
   return Number.isFinite(g) ? g : null
+}
+
+/** Reverse-extract the taxable value from a GST-inclusive gross amount. */
+function reverseGstTaxableAmount(grossAmount, gstPercent) {
+  if (!(gstPercent > 0)) return grossAmount
+  return Math.round((grossAmount / (1 + gstPercent / 100)) * 100) / 100
 }
 
 /** Trim trailing zeros for GST % labels (e.g. 18, 12.5). */
@@ -255,12 +277,23 @@ function computePreview(form, serviceItems = []) {
   const discount = Math.max(0, Number(form.discount_amount) || 0)
   const shop = Math.max(0, Number(form.shop_fees) || 0)
 
-  const lineNets = filteredRows.map((row) => {
+  // Gross amount actually charged per line (what the customer pays for it),
+  // regardless of whether GST is baked into the price or added on top.
+  const lineGross = filteredRows.map((row) => {
     const qty = Number(row.quantity) || 0
     const up = Number(row.unit_price) || 0
     const da = Number(row.discount_amount) || 0
     return Math.max(0, Math.round((qty * up - da) * 100) / 100)
   })
+  const gstRates = filteredRows.map((row) => lineCatalogGstPercent(row, serviceItems))
+  // Taxable (pre-tax) value per line: for GST-inclusive lines this reverse-
+  // extracts the tax already baked into lineGross; exclusive/custom lines are
+  // unchanged (their gross amount already *is* the taxable amount).
+  const lineNets = filteredRows.map((row, i) =>
+    isRowPriceInclusive(row, serviceItems)
+      ? reverseGstTaxableAmount(lineGross[i], gstRates[i] || 0)
+      : lineGross[i],
+  )
   const sub = Math.round(lineNets.reduce((a, b) => a + b, 0) * 100) / 100
   const taxable = Math.max(0, Math.round((sub - discount) * 100) / 100)
 
@@ -268,8 +301,6 @@ function computePreview(form, serviceItems = []) {
   const weightCents = lineNets.map((n) => Math.round(n * 100))
   const lineTaxableCents = allocateCentsByWeight(weightCents, taxableCents)
   const lineTaxable = lineTaxableCents.map((c) => c / 100)
-
-  const gstRates = filteredRows.map((row) => lineCatalogGstPercent(row, serviceItems))
 
   const lineCgst = []
   const lineSgst = []
@@ -499,12 +530,16 @@ export default function AdminJobCardEditor() {
   const isLocked = form.status === 'invoiced'
 
   const rowAmount = (row) => {
-    const net = Math.max(
+    const gross = Math.max(
       0,
       Math.round(((Number(row.quantity) || 0) * (Number(row.unit_price) || 0) - (Number(row.discount_amount) || 0)) * 100) / 100,
     )
+    // GST-inclusive lines already have tax baked into `gross` — adding the tax
+    // breakdown on top again would double-count it. Exclusive/custom lines
+    // still need it added, since their entered price is pre-tax.
+    if (isRowPriceInclusive(row, serviceItems)) return gross
     const tax = preview.taxByKey.get(row.key) ?? 0
-    return net + tax
+    return gross + tax
   }
   const partRows = form.line_items.filter((r) => r.service_type === 'part')
   const labourRows = form.line_items.filter((r) => r.service_type !== 'part')
@@ -515,10 +550,7 @@ export default function AdminJobCardEditor() {
     const hasCatalog = resolveServiceItemPk(row, serviceItems) != null
     const hasDesc = Boolean((row.description || '').trim())
     const isDraft = !hasDesc && !hasCatalog
-    const lineNet = Math.max(
-      0,
-      Math.round(((Number(row.quantity) || 0) * (Number(row.unit_price) || 0) - (Number(row.discount_amount) || 0)) * 100) / 100,
-    )
+    const inclusive = isRowPriceInclusive(row, serviceItems)
     const tax = preview.taxByKey.get(row.key) ?? 0
     return (
       <tr
@@ -557,7 +589,14 @@ export default function AdminJobCardEditor() {
             const item = pk ? serviceItems.find((s) => String(s.id) === pk) : null
             const categoryName = item?.category_name || null
             return categoryName ? (
-              <p className="mt-1 text-xs text-slate-500 dark:text-slate-500">{categoryName}</p>
+              <p className="mt-1 text-xs text-slate-500 dark:text-slate-500">
+                {categoryName}
+                {inclusive && (
+                  <span className="ml-1.5 rounded-full bg-emerald-100 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
+                    incl. GST
+                  </span>
+                )}
+              </p>
             ) : null
           })()}
         </td>
@@ -614,13 +653,13 @@ export default function AdminJobCardEditor() {
               const item = pk ? serviceItems.find((s) => String(s.id) === pk) : null
               return item ? formatGstPercentLabel(Number(item.gst_percentage) || 0) : '0'
             })()}
-            title="Leave blank to use the catalog item's GST%"
+            title={inclusive ? 'Locked — this item\'s price already includes GST at the catalog rate.' : "Leave blank to use the catalog item's GST%"}
             className="w-16 rounded-lg border border-slate-200 bg-white px-2 py-1 text-right tabular-nums focus:border-slate-300 outline-none dark:border-slate-800 dark:bg-slate-900 dark:text-white dark:focus:border-slate-700 disabled:opacity-50"
-            disabled={isLocked}
+            disabled={isLocked || inclusive}
           />
         </td>
         <td className="px-5 py-4 text-right tabular-nums text-slate-600 dark:text-slate-400">{fmtMoney(tax)}</td>
-        <td className="px-5 py-4 text-right font-semibold tabular-nums text-slate-900 dark:text-white">{fmtMoney(lineNet + tax)}</td>
+        <td className="px-5 py-4 text-right font-semibold tabular-nums text-slate-900 dark:text-white">{fmtMoney(rowAmount(row))}</td>
         <td className="px-5 py-4">
           {!isLocked && (
             <button

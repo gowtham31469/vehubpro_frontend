@@ -35,6 +35,7 @@ export default function AdminConfiguration() {
   const [brandsData, setBrandsData] = useState({ count: 0, next: null, previous: null, results: [] })
   const [brandPage, setBrandPage] = useState(1)
   const [brandSearch, setBrandSearch] = useState('')
+  const [debouncedBrandSearch, setDebouncedBrandSearch] = useState('')
   const [brandLoading, setBrandLoading] = useState(true)
   const [brandError, setBrandError] = useState('')
   const [brandModal, setBrandModal] = useState(null)
@@ -59,7 +60,7 @@ export default function AdminConfiguration() {
     setBrandLoading(true)
     setBrandError('')
     try {
-      const data = await fetchBrands({ page, pageSize: 10 })
+      const data = await fetchBrands({ page, pageSize: 10, search: debouncedBrandSearch })
       setBrandsData(data)
       setBrandPage(page)
     } catch (e) {
@@ -71,7 +72,7 @@ export default function AdminConfiguration() {
     } finally {
       setBrandLoading(false)
     }
-  }, [])
+  }, [debouncedBrandSearch])
 
   const loadAllBrands = useCallback(async () => {
     try {
@@ -81,6 +82,11 @@ export default function AdminConfiguration() {
       setBrandAll([])
     }
   }, [])
+
+  useEffect(() => {
+    const t = globalThis.setTimeout(() => setDebouncedBrandSearch(brandSearch), 300)
+    return () => globalThis.clearTimeout(t)
+  }, [brandSearch])
 
   useEffect(() => {
     loadBrands(1)
@@ -93,12 +99,7 @@ export default function AdminConfiguration() {
     }
   }, [tab, loadAllBrands])
 
-  const filteredBrands = useMemo(() => {
-    const q = brandSearch.trim().toLowerCase()
-    const rows = brandsData.results || []
-    if (!q) return rows
-    return rows.filter((b) => b.name?.toLowerCase().includes(q))
-  }, [brandsData.results, brandSearch])
+  const filteredBrands = brandsData.results || []
 
   const openBrandCreate = () => {
     setBrandModalError('')
@@ -176,6 +177,7 @@ export default function AdminConfiguration() {
   const [featuresData, setFeaturesData] = useState({ count: 0, next: null, previous: null, results: [] })
   const [featurePage, setFeaturePage] = useState(1)
   const [featureSearch, setFeatureSearch] = useState('')
+  const [debouncedFeatureSearch, setDebouncedFeatureSearch] = useState('')
   const [featureLoading, setFeatureLoading] = useState(true)
   const [featureError, setFeatureError] = useState('')
   const [featureModal, setFeatureModal] = useState(null)
@@ -188,7 +190,7 @@ export default function AdminConfiguration() {
     setFeatureLoading(true)
     setFeatureError('')
     try {
-      const data = await fetchInventoryFeatures({ page, pageSize: 10 })
+      const data = await fetchInventoryFeatures({ page, pageSize: 10, search: debouncedFeatureSearch })
       setFeaturesData(data)
       setFeaturePage(page)
     } catch (e) {
@@ -200,18 +202,18 @@ export default function AdminConfiguration() {
     } finally {
       setFeatureLoading(false)
     }
-  }, [])
+  }, [debouncedFeatureSearch])
+
+  useEffect(() => {
+    const t = globalThis.setTimeout(() => setDebouncedFeatureSearch(featureSearch), 300)
+    return () => globalThis.clearTimeout(t)
+  }, [featureSearch])
 
   useEffect(() => {
     if (tab === 'features') loadFeatures(1)
   }, [tab, loadFeatures])
 
-  const filteredFeatures = useMemo(() => {
-    const q = featureSearch.trim().toLowerCase()
-    const rows = featuresData.results || []
-    if (!q) return rows
-    return rows.filter((f) => f.name?.toLowerCase().includes(q))
-  }, [featuresData.results, featureSearch])
+  const filteredFeatures = featuresData.results || []
 
   const openFeatureCreate = () => {
     setFeatureModalError('')
@@ -279,6 +281,7 @@ export default function AdminConfiguration() {
   const [modelsData, setModelsData] = useState({ count: 0, next: null, previous: null, results: [] })
   const [modelPage, setModelPage] = useState(1)
   const [modelSearch, setModelSearch] = useState('')
+  const [debouncedModelSearch, setDebouncedModelSearch] = useState('')
   const [modelBrandFilter, setModelBrandFilter] = useState('')
   const [modelLoading, setModelLoading] = useState(true)
   const [modelError, setModelError] = useState('')
@@ -290,6 +293,9 @@ export default function AdminConfiguration() {
   const [isBrandFilterDropdownOpen, setIsBrandFilterDropdownOpen] = useState(false)
   const [isBrandModalDropdownOpen, setIsBrandModalDropdownOpen] = useState(false)
   const [isVehicleTypeModalDropdownOpen, setIsVehicleTypeModalDropdownOpen] = useState(false)
+  const [brandFilterQuery, setBrandFilterQuery] = useState('')
+  const [brandModalQuery, setBrandModalQuery] = useState('')
+  const [vehicleTypeModalQuery, setVehicleTypeModalQuery] = useState('')
   const [vehicleTypes, setVehicleTypes] = useState([])
   const brandFilterDropdownRef = useRef(null)
   const brandModalDropdownRef = useRef(null)
@@ -301,6 +307,39 @@ export default function AdminConfiguration() {
       String(a.name || '').localeCompare(String(b.name || ''), undefined, { sensitivity: 'base' }),
     )
   }, [brandAll])
+
+  // Both brand pickers below (filter dropdown + Add/Edit Model modal) load
+  // from the same already-fetched `sortedBrands` list, so narrowing it here
+  // is a plain client-side filter — no extra fetch needed.
+  const brandFilterOptions = useMemo(() => {
+    const q = brandFilterQuery.trim().toLowerCase()
+    if (!q) return sortedBrands
+    return sortedBrands.filter((b) => b.name?.toLowerCase().includes(q))
+  }, [sortedBrands, brandFilterQuery])
+
+  const brandModalOptions = useMemo(() => {
+    const q = brandModalQuery.trim().toLowerCase()
+    if (!q) return sortedBrands
+    return sortedBrands.filter((b) => b.name?.toLowerCase().includes(q))
+  }, [sortedBrands, brandModalQuery])
+
+  useEffect(() => {
+    if (!isBrandFilterDropdownOpen) setBrandFilterQuery('')
+  }, [isBrandFilterDropdownOpen])
+
+  useEffect(() => {
+    if (!isBrandModalDropdownOpen) setBrandModalQuery('')
+  }, [isBrandModalDropdownOpen])
+
+  const vehicleTypeModalOptions = useMemo(() => {
+    const q = vehicleTypeModalQuery.trim().toLowerCase()
+    if (!q) return vehicleTypes
+    return vehicleTypes.filter((t) => t.name?.toLowerCase().includes(q))
+  }, [vehicleTypes, vehicleTypeModalQuery])
+
+  useEffect(() => {
+    if (!isVehicleTypeModalDropdownOpen) setVehicleTypeModalQuery('')
+  }, [isVehicleTypeModalDropdownOpen])
 
   const selectedFilterBrand = useMemo(
     () => brandAll.find((b) => String(b.id) === String(modelBrandFilter)),
@@ -346,6 +385,7 @@ export default function AdminConfiguration() {
           page,
           pageSize: 10,
           brandId: modelBrandFilter || undefined,
+          search: debouncedModelSearch,
         })
         setModelsData(data)
         setModelPage(page)
@@ -359,22 +399,20 @@ export default function AdminConfiguration() {
         setModelLoading(false)
       }
     },
-    [modelBrandFilter],
+    [modelBrandFilter, debouncedModelSearch],
   )
+
+  useEffect(() => {
+    const t = globalThis.setTimeout(() => setDebouncedModelSearch(modelSearch), 300)
+    return () => globalThis.clearTimeout(t)
+  }, [modelSearch])
 
   useEffect(() => {
     if (tab !== 'models') return
     loadModels(1)
   }, [tab, modelBrandFilter, loadModels])
 
-  const filteredModels = useMemo(() => {
-    const q = modelSearch.trim().toLowerCase()
-    const rows = modelsData.results || []
-    if (!q) return rows
-    return rows.filter(
-      (m) => m.name?.toLowerCase().includes(q) || m.brand_name?.toLowerCase().includes(q),
-    )
-  }, [modelsData.results, modelSearch])
+  const filteredModels = modelsData.results || []
 
   const openModelCreate = async () => {
     setModelModalError('')
@@ -611,37 +649,55 @@ export default function AdminConfiguration() {
                       className={`pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 transition ${isBrandFilterDropdownOpen ? 'rotate-180' : ''}`}
                     />
                     {isBrandFilterDropdownOpen ? (
-                      <div className="absolute left-0 right-0 z-20 mt-2 max-h-56 overflow-auto rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-lg">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setModelBrandFilter('')
-                            setIsBrandFilterDropdownOpen(false)
-                          }}
-                          className={`flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm transition ${!modelBrandFilter ? 'font-semibold' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
-                          style={!modelBrandFilter ? { backgroundColor: theme.accentSoft, color: theme.accent } : undefined}
-                        >
-                          {!modelBrandFilter ? <Check size={14} /> : <span className="w-[14px]" />}
-                          All brands
-                        </button>
-                        {sortedBrands.map((b) => {
-                          const sel = String(modelBrandFilter) === String(b.id)
-                          return (
-                            <button
-                              key={b.id}
-                              type="button"
-                              onClick={() => {
-                                setModelBrandFilter(String(b.id))
-                                setIsBrandFilterDropdownOpen(false)
-                              }}
-                              className={`flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm transition ${sel ? 'font-semibold' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
-                              style={sel ? { backgroundColor: theme.accentSoft, color: theme.accent } : undefined}
-                            >
-                              {sel ? <Check size={14} /> : <span className="w-[14px]" />}
-                              <span className="min-w-0 flex-1 truncate">{b.name}</span>
-                            </button>
-                          )
-                        })}
+                      <div className="absolute left-0 right-0 z-20 mt-2 max-h-72 overflow-hidden rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-lg">
+                        <div className="sticky top-0 border-b border-slate-100 bg-white p-2 dark:border-slate-800 dark:bg-slate-900">
+                          <div className="relative">
+                            <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500" />
+                            <input
+                              autoFocus
+                              value={brandFilterQuery}
+                              onChange={(e) => setBrandFilterQuery(e.target.value)}
+                              placeholder="Search brands..."
+                              className="w-full rounded-lg border border-slate-200 bg-slate-50 py-1.5 pl-8 pr-2 text-sm text-slate-700 outline-none focus:border-slate-400 dark:border-slate-700 dark:bg-slate-950/50 dark:text-slate-100 dark:placeholder:text-slate-600"
+                            />
+                          </div>
+                        </div>
+                        <div className="max-h-56 overflow-auto">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setModelBrandFilter('')
+                              setIsBrandFilterDropdownOpen(false)
+                            }}
+                            className={`flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm transition ${!modelBrandFilter ? 'font-semibold' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
+                            style={!modelBrandFilter ? { backgroundColor: theme.accentSoft, color: theme.accent } : undefined}
+                          >
+                            {!modelBrandFilter ? <Check size={14} /> : <span className="w-[14px]" />}
+                            All brands
+                          </button>
+                          {brandFilterOptions.length === 0 ? (
+                            <p className="px-3 py-3 text-xs text-slate-400 dark:text-slate-500">No brands match.</p>
+                          ) : (
+                            brandFilterOptions.map((b) => {
+                              const sel = String(modelBrandFilter) === String(b.id)
+                              return (
+                                <button
+                                  key={b.id}
+                                  type="button"
+                                  onClick={() => {
+                                    setModelBrandFilter(String(b.id))
+                                    setIsBrandFilterDropdownOpen(false)
+                                  }}
+                                  className={`flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm transition ${sel ? 'font-semibold' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
+                                  style={sel ? { backgroundColor: theme.accentSoft, color: theme.accent } : undefined}
+                                >
+                                  {sel ? <Check size={14} /> : <span className="w-[14px]" />}
+                                  <span className="min-w-0 flex-1 truncate">{b.name}</span>
+                                </button>
+                              )
+                            })
+                          )}
+                        </div>
                       </div>
                     ) : null}
                   </div>
@@ -942,7 +998,20 @@ export default function AdminConfiguration() {
                     className={`pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 transition ${isBrandModalDropdownOpen ? 'rotate-180' : ''}`}
                   />
                   {isBrandModalDropdownOpen ? (
-                    <div className="absolute left-0 right-0 z-[60] mt-2 max-h-56 overflow-auto rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-lg">
+                    <div className="absolute left-0 right-0 z-[60] mt-2 max-h-72 overflow-hidden rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-lg">
+                      <div className="sticky top-0 border-b border-slate-100 bg-white p-2 dark:border-slate-800 dark:bg-slate-900">
+                        <div className="relative">
+                          <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500" />
+                          <input
+                            autoFocus
+                            value={brandModalQuery}
+                            onChange={(e) => setBrandModalQuery(e.target.value)}
+                            placeholder="Search brands..."
+                            className="w-full rounded-lg border border-slate-200 bg-slate-50 py-1.5 pl-8 pr-2 text-sm text-slate-700 outline-none focus:border-slate-400 dark:border-slate-700 dark:bg-slate-950/50 dark:text-slate-100 dark:placeholder:text-slate-600"
+                          />
+                        </div>
+                      </div>
+                      <div className="max-h-56 overflow-auto">
                       <button
                         type="button"
                         onClick={() => {
@@ -956,25 +1025,30 @@ export default function AdminConfiguration() {
                         {!modelForm.brand ? <Check size={14} /> : <span className="w-[14px]" />}
                         Select brand
                       </button>
-                      {sortedBrands.map((b) => {
-                        const sel = String(modelForm.brand) === String(b.id)
-                        return (
-                          <button
-                            key={b.id}
-                            type="button"
-                            onClick={() => {
-                              setModelModalError('')
-                              setModelForm((p) => ({ ...p, brand: String(b.id) }))
-                              setIsBrandModalDropdownOpen(false)
-                            }}
-                            className={`flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm transition ${sel ? 'font-semibold' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
-                            style={sel ? { backgroundColor: theme.accentSoft, color: theme.accent } : undefined}
-                          >
-                            {sel ? <Check size={14} /> : <span className="w-[14px]" />}
-                            <span className="min-w-0 flex-1 truncate">{b.name}</span>
-                          </button>
-                        )
-                      })}
+                      {brandModalOptions.length === 0 ? (
+                        <p className="px-3 py-3 text-xs text-slate-400 dark:text-slate-500">No brands match.</p>
+                      ) : (
+                        brandModalOptions.map((b) => {
+                          const sel = String(modelForm.brand) === String(b.id)
+                          return (
+                            <button
+                              key={b.id}
+                              type="button"
+                              onClick={() => {
+                                setModelModalError('')
+                                setModelForm((p) => ({ ...p, brand: String(b.id) }))
+                                setIsBrandModalDropdownOpen(false)
+                              }}
+                              className={`flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm transition ${sel ? 'font-semibold' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
+                              style={sel ? { backgroundColor: theme.accentSoft, color: theme.accent } : undefined}
+                            >
+                              {sel ? <Check size={14} /> : <span className="w-[14px]" />}
+                              <span className="min-w-0 flex-1 truncate">{b.name}</span>
+                            </button>
+                          )
+                        })
+                      )}
+                      </div>
                     </div>
                   ) : null}
                 </div>
@@ -998,7 +1072,20 @@ export default function AdminConfiguration() {
                     className={`pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 transition ${isVehicleTypeModalDropdownOpen ? 'rotate-180' : ''}`}
                   />
                   {isVehicleTypeModalDropdownOpen ? (
-                    <div className="absolute left-0 right-0 z-[60] mt-2 max-h-56 overflow-auto rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-lg">
+                    <div className="absolute left-0 right-0 z-[60] mt-2 max-h-72 overflow-hidden rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-lg">
+                      <div className="sticky top-0 border-b border-slate-100 bg-white p-2 dark:border-slate-800 dark:bg-slate-900">
+                        <div className="relative">
+                          <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500" />
+                          <input
+                            autoFocus
+                            value={vehicleTypeModalQuery}
+                            onChange={(e) => setVehicleTypeModalQuery(e.target.value)}
+                            placeholder="Search vehicle types..."
+                            className="w-full rounded-lg border border-slate-200 bg-slate-50 py-1.5 pl-8 pr-2 text-sm text-slate-700 outline-none focus:border-slate-400 dark:border-slate-700 dark:bg-slate-950/50 dark:text-slate-100 dark:placeholder:text-slate-600"
+                          />
+                        </div>
+                      </div>
+                      <div className="max-h-56 overflow-auto">
                       <button
                         type="button"
                         onClick={() => {
@@ -1012,25 +1099,30 @@ export default function AdminConfiguration() {
                         {!modelForm.vehicle_type ? <Check size={14} /> : <span className="w-[14px]" />}
                         Select vehicle type
                       </button>
-                      {vehicleTypes.map((t) => {
-                        const sel = String(modelForm.vehicle_type) === String(t.id)
-                        return (
-                          <button
-                            key={t.id}
-                            type="button"
-                            onClick={() => {
-                              setModelModalError('')
-                              setModelForm((p) => ({ ...p, vehicle_type: String(t.id) }))
-                              setIsVehicleTypeModalDropdownOpen(false)
-                            }}
-                            className={`flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm transition ${sel ? 'font-semibold' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
-                            style={sel ? { backgroundColor: theme.accentSoft, color: theme.accent } : undefined}
-                          >
-                            {sel ? <Check size={14} /> : <span className="w-[14px]" />}
-                            <span className="min-w-0 flex-1 truncate">{t.name}</span>
-                          </button>
-                        )
-                      })}
+                      {vehicleTypeModalOptions.length === 0 ? (
+                        <p className="px-3 py-3 text-xs text-slate-400 dark:text-slate-500">No vehicle types match.</p>
+                      ) : (
+                        vehicleTypeModalOptions.map((t) => {
+                          const sel = String(modelForm.vehicle_type) === String(t.id)
+                          return (
+                            <button
+                              key={t.id}
+                              type="button"
+                              onClick={() => {
+                                setModelModalError('')
+                                setModelForm((p) => ({ ...p, vehicle_type: String(t.id) }))
+                                setIsVehicleTypeModalDropdownOpen(false)
+                              }}
+                              className={`flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm transition ${sel ? 'font-semibold' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
+                              style={sel ? { backgroundColor: theme.accentSoft, color: theme.accent } : undefined}
+                            >
+                              {sel ? <Check size={14} /> : <span className="w-[14px]" />}
+                              <span className="min-w-0 flex-1 truncate">{t.name}</span>
+                            </button>
+                          )
+                        })
+                      )}
+                      </div>
                     </div>
                   ) : null}
                 </div>

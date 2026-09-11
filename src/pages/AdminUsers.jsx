@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Pencil, Plus, Search, ShieldCheck, Trash2, X } from 'lucide-react'
 import AdminShell from '../components/AdminShell'
 import SearchableSelect from '../components/SearchableSelect'
@@ -56,6 +56,7 @@ export default function AdminUsers() {
   const [page, setPage] = useState(1)
   const [pageSize] = useState(10)
   const [searchText, setSearchText] = useState('')
+  const [debouncedSearchText, setDebouncedSearchText] = useState('')
   const [isLoading, setIsLoading] = useState(true)
   const [errorMessage, setErrorMessage] = useState('')
 
@@ -80,7 +81,7 @@ export default function AdminUsers() {
     setIsLoading(true)
     setErrorMessage('')
     try {
-      const data = await fetchStaffUsers({ page: targetPage, pageSize })
+      const data = await fetchStaffUsers({ page: targetPage, pageSize, search: debouncedSearchText })
       setUsersData(data)
     } catch (err) {
       if (err.message === 'SESSION_EXPIRED') {
@@ -94,9 +95,14 @@ export default function AdminUsers() {
   }
 
   useEffect(() => {
+    const t = globalThis.setTimeout(() => setDebouncedSearchText(searchText), 300)
+    return () => globalThis.clearTimeout(t)
+  }, [searchText])
+
+  useEffect(() => {
     loadUsers(1)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [debouncedSearchText])
 
   useEffect(() => {
     fetchRoles()
@@ -120,18 +126,7 @@ export default function AdminUsers() {
     }
   }
 
-  const visibleUsers = useMemo(() => {
-    const source = usersData.results || []
-    const query = searchText.trim().toLowerCase()
-    return source.filter((u) => {
-      if (!query) return true
-      return (
-        u.full_name_value?.toLowerCase().includes(query) ||
-        u.email_value?.toLowerCase().includes(query) ||
-        u.phone_value?.toLowerCase().includes(query)
-      )
-    })
-  }, [usersData.results, searchText])
+  const visibleUsers = usersData.results || []
 
   const openCreate = () => {
     setEditingUser(null)

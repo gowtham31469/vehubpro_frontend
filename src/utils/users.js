@@ -8,8 +8,9 @@ async function parseResponse(path, options, fallbackError) {
   return unwrapData(payload)
 }
 
-export async function fetchStaffUsers({ page = 1, pageSize = 10 } = {}) {
+export async function fetchStaffUsers({ page = 1, pageSize = 10, search = '' } = {}) {
   const params = new URLSearchParams({ page: String(page), page_size: String(pageSize) })
+  if (search.trim()) params.set('search', search.trim())
   return parseResponse(`/api/v1/users/staff/?${params.toString()}`, { method: 'GET' }, 'Failed to fetch users.')
 }
 

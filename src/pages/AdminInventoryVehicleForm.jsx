@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Plus, UploadCloud, X } from 'lucide-react'
+import { Check, Plus, UploadCloud, X } from 'lucide-react'
 import AdminShell from '../components/AdminShell'
 import SearchableSelect from '../components/SearchableSelect'
 import { useToast } from '../context/ToastContext.jsx'
@@ -15,6 +15,23 @@ import {
 
 const BODY_TYPE_CODES = new Set(['hatchback', 'sedan', 'suv', 'muv', 'luxury_sedan', 'luxury_suv'])
 
+// A fixed palette, not tenant-managed master data — mirrors
+// InventoryVehicle.COLOR_CHOICES in backend/apps/platform/portfolio/models.py.
+// Keep the `code`s in sync if that list changes.
+const COLOR_OPTIONS = [
+  { code: 'yellow', name: 'Yellow', hex: '#FDE94B', light: true },
+  { code: 'red', name: 'Red', hex: '#C0392B' },
+  { code: 'beige', name: 'Beige', hex: '#D8C7A1', light: true },
+  { code: 'purple', name: 'Purple', hex: '#9C3FD4' },
+  { code: 'white', name: 'White', hex: '#FFFFFF', light: true },
+  { code: 'silver', name: 'Silver', hex: '#C8C8C8', light: true },
+  { code: 'gray', name: 'Gray', hex: '#8C8C8C' },
+  { code: 'black', name: 'Black', hex: '#1A1A1A' },
+  { code: 'blue', name: 'Blue', hex: '#3B6FD4' },
+  { code: 'green', name: 'Green', hex: '#4FAE5C' },
+  { code: 'orange', name: 'Orange', hex: '#E8912B' },
+]
+
 function emptyForm(y0) {
   return {
     vehicle_type: '',
@@ -23,6 +40,7 @@ function emptyForm(y0) {
     year: y0,
     fuel_type: '',
     transmission: 'automatic',
+    color: '',
     mileage_km: '',
     key_features: [],
     listing_price: '',
@@ -40,6 +58,7 @@ function vehicleToForm(v, y0) {
     year: v.year ?? y0,
     fuel_type: v.fuel_type || '',
     transmission: v.transmission || 'automatic',
+    color: v.color || '',
     mileage_km: v.mileage_km ?? '',
     key_features: (v.key_features || []).map(String),
     listing_price: v.listing_price ?? '',
@@ -225,6 +244,7 @@ export default function AdminInventoryVehicleForm() {
       year: Number(form.year),
       fuel_type: form.fuel_type,
       transmission: form.transmission,
+      color: form.color,
       mileage_km: form.mileage_km === '' ? 0 : Number(form.mileage_km),
       key_features: form.key_features,
       listing_price: form.listing_price === '' ? 0 : Number(form.listing_price),
@@ -334,6 +354,41 @@ export default function AdminInventoryVehicleForm() {
                   onChange={(e) => setForm((p) => ({ ...p, year: e.target.value }))}
                   className={inputCls}
                 />
+              </div>
+            </div>
+
+            <div className="mt-4">
+              <label className={labelCls}>Color</label>
+              <div className="flex flex-wrap gap-3">
+                {COLOR_OPTIONS.map((c) => {
+                  const active = form.color === c.code
+                  return (
+                    <button
+                      key={c.code}
+                      type="button"
+                      onClick={() => setForm((p) => ({ ...p, color: p.color === c.code ? '' : c.code }))}
+                      className="relative h-12 w-12 rounded-2xl border-2 transition"
+                      style={{
+                        backgroundColor: c.hex,
+                        borderColor: active ? theme.accent : c.code === 'white' ? '#94a3b8' : 'transparent',
+                      }}
+                      aria-label={c.name}
+                      aria-pressed={active}
+                      title={c.name}
+                    >
+                      {/* A border alone reads poorly on light swatches — pair it
+                          with a checkmark whose color contrasts the swatch. */}
+                      {active ? (
+                        <Check
+                          size={18}
+                          strokeWidth={3}
+                          className="absolute inset-0 m-auto"
+                          style={{ color: c.light ? '#141414' : '#fff' }}
+                        />
+                      ) : null}
+                    </button>
+                  )
+                })}
               </div>
             </div>
           </SectionCard>

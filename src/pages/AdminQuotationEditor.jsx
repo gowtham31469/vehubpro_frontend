@@ -46,24 +46,39 @@ function emptyForm() {
   }
 }
 
+/** Reverse-extract the taxable value from a GST-inclusive gross amount. */
+function reverseGstTaxableAmount(grossAmount, gstPercent) {
+  if (!(gstPercent > 0)) return grossAmount
+  return round2(grossAmount / (1 + gstPercent / 100))
+}
+
 /** Client-side preview only — the backend always recomputes and is authoritative. */
 function computePreview(form, serviceItems) {
   const rows = form.line_items.filter((r) => (r.description || '').trim() || r.service_item)
   const discount = Math.max(0, Number(form.discount_amount) || 0)
 
-  const lineNets = rows.map((r) => {
+  // Gross amount actually charged per line, before separating out any
+  // GST already baked into an inclusive-priced catalog item.
+  const lineGross = rows.map((r) => {
     const qty = Number(r.quantity) || 0
     const up = Number(r.unit_price) || 0
     const da = Number(r.discount_amount) || 0
     return Math.max(0, round2(qty * up - da))
   })
-  const sub = round2(lineNets.reduce((a, b) => a + b, 0))
-  const taxable = Math.max(0, round2(sub - discount))
-
   const gstRates = rows.map((r) => {
     const item = serviceItems.find((s) => s.id === r.service_item)
     return item ? Number(item.gst_percentage) || 0 : 0
   })
+  // Taxable (pre-tax) value per line — inclusive lines reverse-extract the
+  // baked-in tax; exclusive/custom lines are unchanged.
+  const lineNets = rows.map((r, i) => {
+    const item = serviceItems.find((s) => s.id === r.service_item)
+    return item && item.price_type === 'inclusive'
+      ? reverseGstTaxableAmount(lineGross[i], gstRates[i])
+      : lineGross[i]
+  })
+  const sub = round2(lineNets.reduce((a, b) => a + b, 0))
+  const taxable = Math.max(0, round2(sub - discount))
 
   let cgst = 0
   let sgst = 0
@@ -507,8 +522,12 @@ export default function AdminQuotationEditor() {
                       const qty = Number(row.quantity) || 0
                       const unitPrice = Number(row.unit_price) || 0
                       const lineDiscount = Number(row.discount_amount) || 0
-                      const lineNet = Math.max(0, round2(qty * unitPrice - lineDiscount))
+                      const lineGross = Math.max(0, round2(qty * unitPrice - lineDiscount))
                       const tax = preview.taxByKey.get(row.key) ?? 0
+                      const inclusive = catalogItem?.price_type === 'inclusive'
+                      // GST-inclusive lines already have tax baked into lineGross —
+                      // adding the breakdown on top again would double-count it.
+                      const lineTotal = inclusive ? lineGross : lineGross + tax
                       const isDraft = !(row.description || '').trim() && !row.service_item
                       return (
                         <tr
@@ -531,7 +550,14 @@ export default function AdminQuotationEditor() {
                               className="mt-1 w-full min-w-[160px] border-0 bg-transparent p-0 text-xs text-slate-500 outline-none focus:ring-0 dark:text-slate-400 disabled:opacity-50"
                             />
                             {catalogItem?.category_name ? (
-                              <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">{catalogItem.category_name}</p>
+                              <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">
+                                {catalogItem.category_name}
+                                {inclusive && (
+                                  <span className="ml-1.5 rounded-full bg-emerald-100 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
+                                    incl. GST
+                                  </span>
+                                )}
+                              </p>
                             ) : null}
                           </td>
                           <td className="px-5 py-4 text-right">
@@ -568,7 +594,7 @@ export default function AdminQuotationEditor() {
                             ) : null}
                           </td>
                           <td className="px-5 py-4 text-right font-semibold tabular-nums text-slate-900 dark:text-white">
-                            {fmtMoney(lineNet + tax)}
+                            {fmtMoney(lineTotal)}
                           </td>
                           <td className="px-5 py-4">
                             {!isLocked && (

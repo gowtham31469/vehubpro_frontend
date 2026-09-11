@@ -23,7 +23,12 @@ const SERVICE_TYPE_OPTIONS = [
   { value: 'part', label: 'Part' },
 ]
 
-const emptyItem = { category: '', name: '', description: '', service_type: '', base_price: '', hsn_code: '', gst_percentage: '', applicable_vehicle_types: [], is_active: true }
+const PRICE_TYPE_OPTIONS = [
+  { value: 'exclusive', label: 'Exclusive of GST', hint: 'GST is added on top of the base price.' },
+  { value: 'inclusive', label: 'Inclusive of GST', hint: 'Base price already includes GST.' },
+]
+
+const emptyItem = { category: '', name: '', description: '', service_type: '', base_price: '', hsn_code: '', gst_percentage: '', price_type: 'exclusive', applicable_vehicle_types: [], is_active: true }
 
 export default function AdminServices() {
   const { theme } = useTenantBranding()
@@ -55,6 +60,7 @@ export default function AdminServices() {
   const [isVtCatDropdownOpen, setIsVtCatDropdownOpen] = useState(false)
   const vtCatDropdownRef = useRef(null)
   const categoryPreserveRef = useRef({ sort_order: 0, icon_code: null })
+  const [vtCatQuery, setVtCatQuery] = useState('')
 
   useEffect(() => {
     if (!isVtCatDropdownOpen) return undefined
@@ -64,6 +70,16 @@ export default function AdminServices() {
     document.addEventListener('mousedown', handlePointerDown)
     return () => document.removeEventListener('mousedown', handlePointerDown)
   }, [isVtCatDropdownOpen])
+
+  useEffect(() => {
+    if (!isVtCatDropdownOpen) setVtCatQuery('')
+  }, [isVtCatDropdownOpen])
+
+  const vtCatOptions = useMemo(() => {
+    const q = vtCatQuery.trim().toLowerCase()
+    if (!q) return vehicleTypes
+    return vehicleTypes.filter((vt) => vt.name?.toLowerCase().includes(q))
+  }, [vehicleTypes, vtCatQuery])
 
   const loadCategories = useCallback(async (page = 1) => {
     setCatLoading(true)
@@ -202,11 +218,47 @@ export default function AdminServices() {
   const catFilterDropdownRef = useRef(null)
   const catModalDropdownRef = useRef(null)
   const vtItemDropdownRef = useRef(null)
+  const [catFilterQuery, setCatFilterQuery] = useState('')
+  const [catModalQuery, setCatModalQuery] = useState('')
+  const [vtItemQuery, setVtItemQuery] = useState('')
+
+  useEffect(() => {
+    if (!isVtItemDropdownOpen) setVtItemQuery('')
+  }, [isVtItemDropdownOpen])
+
+  const vtItemOptions = useMemo(() => {
+    const q = vtItemQuery.trim().toLowerCase()
+    if (!q) return vehicleTypes
+    return vehicleTypes.filter((vt) => vt.name?.toLowerCase().includes(q))
+  }, [vehicleTypes, vtItemQuery])
 
   const sortedCategories = useMemo(() => {
     const rows = catAll || []
     return [...rows].sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), undefined, { sensitivity: 'base' }))
   }, [catAll])
+
+  // Both category pickers below (filter dropdown + New/Edit item modal) read
+  // from this same already-fetched `sortedCategories` list, so narrowing it
+  // here is a plain client-side filter — no extra fetch needed.
+  const catFilterOptions = useMemo(() => {
+    const q = catFilterQuery.trim().toLowerCase()
+    if (!q) return sortedCategories
+    return sortedCategories.filter((c) => c.name?.toLowerCase().includes(q))
+  }, [sortedCategories, catFilterQuery])
+
+  const catModalOptions = useMemo(() => {
+    const q = catModalQuery.trim().toLowerCase()
+    if (!q) return sortedCategories
+    return sortedCategories.filter((c) => c.name?.toLowerCase().includes(q))
+  }, [sortedCategories, catModalQuery])
+
+  useEffect(() => {
+    if (!isCatFilterDropdownOpen) setCatFilterQuery('')
+  }, [isCatFilterDropdownOpen])
+
+  useEffect(() => {
+    if (!isCatModalDropdownOpen) setCatModalQuery('')
+  }, [isCatModalDropdownOpen])
 
   const selectedFilterCat = useMemo(
     () => catAll.find((c) => String(c.id) === String(itemCatFilter)),
@@ -295,6 +347,7 @@ export default function AdminServices() {
       base_price: item.base_price ?? '',
       hsn_code: item.hsn_code || '',
       gst_percentage: item.gst_percentage ?? '',
+      price_type: item.price_type || 'exclusive',
       applicable_vehicle_types: item.applicable_vehicle_types || [],
       is_active: Boolean(item.is_active),
     })
@@ -334,6 +387,7 @@ export default function AdminServices() {
         base_price: String(itemForm.base_price),
         hsn_code: itemForm.hsn_code.trim(),
         gst_percentage: String(itemForm.gst_percentage || 0),
+        price_type: itemForm.price_type || 'exclusive',
         unit_type: 'per_service',
         applicable_vehicle_types: itemForm.applicable_vehicle_types,
         is_active: itemForm.is_active,
@@ -513,31 +567,49 @@ export default function AdminServices() {
                     </button>
                     <ChevronDown size={16} className={`pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 transition ${isCatFilterDropdownOpen ? 'rotate-180' : ''}`} />
                     {isCatFilterDropdownOpen ? (
-                      <div className="absolute left-0 right-0 z-20 mt-2 max-h-56 overflow-auto rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-lg">
-                        <button
-                          type="button"
-                          onClick={() => { setItemCatFilter(''); setIsCatFilterDropdownOpen(false) }}
-                          className={`flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm transition ${!itemCatFilter ? 'font-semibold' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
-                          style={!itemCatFilter ? { backgroundColor: theme.accentSoft, color: theme.accent } : undefined}
-                        >
-                          {!itemCatFilter ? <Check size={14} /> : <span className="w-[14px]" />}
-                          All categories
-                        </button>
-                        {sortedCategories.map((c) => {
-                          const sel = String(itemCatFilter) === String(c.id)
-                          return (
-                            <button
-                              key={c.id}
-                              type="button"
-                              onClick={() => { setItemCatFilter(String(c.id)); setIsCatFilterDropdownOpen(false) }}
-                              className={`flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm transition ${sel ? 'font-semibold' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
-                              style={sel ? { backgroundColor: theme.accentSoft, color: theme.accent } : undefined}
-                            >
-                              {sel ? <Check size={14} /> : <span className="w-[14px]" />}
-                              <span className="min-w-0 flex-1 truncate">{c.name}</span>
-                            </button>
-                          )
-                        })}
+                      <div className="absolute left-0 right-0 z-20 mt-2 max-h-72 overflow-hidden rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-lg">
+                        <div className="sticky top-0 border-b border-slate-100 bg-white p-2 dark:border-slate-800 dark:bg-slate-900">
+                          <div className="relative">
+                            <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500" />
+                            <input
+                              autoFocus
+                              value={catFilterQuery}
+                              onChange={(e) => setCatFilterQuery(e.target.value)}
+                              placeholder="Search categories..."
+                              className="w-full rounded-lg border border-slate-200 bg-slate-50 py-1.5 pl-8 pr-2 text-sm text-slate-700 outline-none focus:border-slate-400 dark:border-slate-700 dark:bg-slate-950/50 dark:text-slate-100 dark:placeholder:text-slate-600"
+                            />
+                          </div>
+                        </div>
+                        <div className="max-h-56 overflow-auto">
+                          <button
+                            type="button"
+                            onClick={() => { setItemCatFilter(''); setIsCatFilterDropdownOpen(false) }}
+                            className={`flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm transition ${!itemCatFilter ? 'font-semibold' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
+                            style={!itemCatFilter ? { backgroundColor: theme.accentSoft, color: theme.accent } : undefined}
+                          >
+                            {!itemCatFilter ? <Check size={14} /> : <span className="w-[14px]" />}
+                            All categories
+                          </button>
+                          {catFilterOptions.length === 0 ? (
+                            <p className="px-3 py-3 text-xs text-slate-400 dark:text-slate-500">No categories match.</p>
+                          ) : (
+                            catFilterOptions.map((c) => {
+                              const sel = String(itemCatFilter) === String(c.id)
+                              return (
+                                <button
+                                  key={c.id}
+                                  type="button"
+                                  onClick={() => { setItemCatFilter(String(c.id)); setIsCatFilterDropdownOpen(false) }}
+                                  className={`flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm transition ${sel ? 'font-semibold' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
+                                  style={sel ? { backgroundColor: theme.accentSoft, color: theme.accent } : undefined}
+                                >
+                                  {sel ? <Check size={14} /> : <span className="w-[14px]" />}
+                                  <span className="min-w-0 flex-1 truncate">{c.name}</span>
+                                </button>
+                              )
+                            })
+                          )}
+                        </div>
                       </div>
                     ) : null}
                   </div>
@@ -600,7 +672,14 @@ export default function AdminServices() {
                                 {item.service_type}
                               </span>
                             </td>
-                            <td className="px-6 py-3 text-slate-600 dark:text-slate-400">₹{Number(item.base_price).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+                            <td className="px-6 py-3 text-slate-600 dark:text-slate-400">
+                              ₹{Number(item.base_price).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                              {item.price_type === 'inclusive' && (
+                                <span className="ml-1.5 rounded-full bg-emerald-100 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
+                                  incl. GST
+                                </span>
+                              )}
+                            </td>
                             <td className="px-6 py-3 text-slate-600 dark:text-slate-400">{item.gst_percentage}%</td>
 
                             <td className="px-6 py-3">
@@ -662,22 +741,40 @@ export default function AdminServices() {
                   </button>
                   <ChevronDown size={16} className={`pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 transition ${isVtCatDropdownOpen ? 'rotate-180' : ''}`} />
                   {isVtCatDropdownOpen ? (
-                    <div className="absolute left-0 right-0 z-[60] mt-2 max-h-56 overflow-auto rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-lg">
-                      {vehicleTypes.map((vt) => {
-                        const sel = (catForm.applicable_vehicle_types || []).includes(vt.code)
-                        return (
-                          <button
-                            key={vt.id}
-                            type="button"
-                            onClick={() => toggleVtCat(vt.code)}
-                            className={`flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm transition ${sel ? 'font-semibold' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
-                            style={sel ? { backgroundColor: theme.accentSoft, color: theme.accent } : undefined}
-                          >
-                            {sel ? <Check size={14} /> : <span className="w-[14px]" />}
-                            <span className="min-w-0 flex-1 truncate">{vt.name}</span>
-                          </button>
-                        )
-                      })}
+                    <div className="absolute left-0 right-0 z-[60] mt-2 max-h-72 overflow-hidden rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-lg">
+                      <div className="sticky top-0 border-b border-slate-100 bg-white p-2 dark:border-slate-800 dark:bg-slate-900">
+                        <div className="relative">
+                          <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500" />
+                          <input
+                            autoFocus
+                            value={vtCatQuery}
+                            onChange={(e) => setVtCatQuery(e.target.value)}
+                            placeholder="Search vehicle types..."
+                            className="w-full rounded-lg border border-slate-200 bg-slate-50 py-1.5 pl-8 pr-2 text-sm text-slate-700 outline-none focus:border-slate-400 dark:border-slate-700 dark:bg-slate-950/50 dark:text-slate-100 dark:placeholder:text-slate-600"
+                          />
+                        </div>
+                      </div>
+                      <div className="max-h-56 overflow-auto">
+                        {vtCatOptions.length === 0 ? (
+                          <p className="px-3 py-3 text-xs text-slate-400 dark:text-slate-500">No vehicle types match.</p>
+                        ) : (
+                          vtCatOptions.map((vt) => {
+                            const sel = (catForm.applicable_vehicle_types || []).includes(vt.code)
+                            return (
+                              <button
+                                key={vt.id}
+                                type="button"
+                                onClick={() => toggleVtCat(vt.code)}
+                                className={`flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm transition ${sel ? 'font-semibold' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
+                                style={sel ? { backgroundColor: theme.accentSoft, color: theme.accent } : undefined}
+                              >
+                                {sel ? <Check size={14} /> : <span className="w-[14px]" />}
+                                <span className="min-w-0 flex-1 truncate">{vt.name}</span>
+                              </button>
+                            )
+                          })
+                        )}
+                      </div>
                     </div>
                   ) : null}
                 </div>
@@ -740,31 +837,49 @@ export default function AdminServices() {
                   </button>
                   <ChevronDown size={16} className={`pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 transition ${isCatModalDropdownOpen ? 'rotate-180' : ''}`} />
                   {isCatModalDropdownOpen ? (
-                    <div className="absolute left-0 right-0 z-[60] mt-2 max-h-56 overflow-auto rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-lg">
-                      <button
-                        type="button"
-                        onClick={() => { setItemForm((p) => ({ ...p, category: '' })); setIsCatModalDropdownOpen(false) }}
-                        className={`flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm transition ${!itemForm.category ? 'font-semibold' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
-                        style={!itemForm.category ? { backgroundColor: theme.accentSoft, color: theme.accent } : undefined}
-                      >
-                        {!itemForm.category ? <Check size={14} /> : <span className="w-[14px]" />}
-                        Select category
-                      </button>
-                      {sortedCategories.map((c) => {
-                        const sel = String(itemForm.category) === String(c.id)
-                        return (
-                          <button
-                            key={c.id}
-                            type="button"
-                            onClick={() => { setItemForm((p) => ({ ...p, category: String(c.id) })); setIsCatModalDropdownOpen(false) }}
-                            className={`flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm transition ${sel ? 'font-semibold' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
-                            style={sel ? { backgroundColor: theme.accentSoft, color: theme.accent } : undefined}
-                          >
-                            {sel ? <Check size={14} /> : <span className="w-[14px]" />}
-                            <span className="min-w-0 flex-1 truncate">{c.name}</span>
-                          </button>
-                        )
-                      })}
+                    <div className="absolute left-0 right-0 z-[60] mt-2 max-h-72 overflow-hidden rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-lg">
+                      <div className="sticky top-0 border-b border-slate-100 bg-white p-2 dark:border-slate-800 dark:bg-slate-900">
+                        <div className="relative">
+                          <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500" />
+                          <input
+                            autoFocus
+                            value={catModalQuery}
+                            onChange={(e) => setCatModalQuery(e.target.value)}
+                            placeholder="Search categories..."
+                            className="w-full rounded-lg border border-slate-200 bg-slate-50 py-1.5 pl-8 pr-2 text-sm text-slate-700 outline-none focus:border-slate-400 dark:border-slate-700 dark:bg-slate-950/50 dark:text-slate-100 dark:placeholder:text-slate-600"
+                          />
+                        </div>
+                      </div>
+                      <div className="max-h-56 overflow-auto">
+                        <button
+                          type="button"
+                          onClick={() => { setItemForm((p) => ({ ...p, category: '' })); setIsCatModalDropdownOpen(false) }}
+                          className={`flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm transition ${!itemForm.category ? 'font-semibold' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
+                          style={!itemForm.category ? { backgroundColor: theme.accentSoft, color: theme.accent } : undefined}
+                        >
+                          {!itemForm.category ? <Check size={14} /> : <span className="w-[14px]" />}
+                          Select category
+                        </button>
+                        {catModalOptions.length === 0 ? (
+                          <p className="px-3 py-3 text-xs text-slate-400 dark:text-slate-500">No categories match.</p>
+                        ) : (
+                          catModalOptions.map((c) => {
+                            const sel = String(itemForm.category) === String(c.id)
+                            return (
+                              <button
+                                key={c.id}
+                                type="button"
+                                onClick={() => { setItemForm((p) => ({ ...p, category: String(c.id) })); setIsCatModalDropdownOpen(false) }}
+                                className={`flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm transition ${sel ? 'font-semibold' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
+                                style={sel ? { backgroundColor: theme.accentSoft, color: theme.accent } : undefined}
+                              >
+                                {sel ? <Check size={14} /> : <span className="w-[14px]" />}
+                                <span className="min-w-0 flex-1 truncate">{c.name}</span>
+                              </button>
+                            )
+                          })
+                        )}
+                      </div>
                     </div>
                   ) : null}
                 </div>
@@ -852,6 +967,37 @@ export default function AdminServices() {
                 </div>
               </div>
 
+              {/* GST inclusive/exclusive */}
+              <div>
+                <label className="mb-1 block text-xs font-semibold text-slate-500 dark:text-slate-400">
+                  Price Type
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  {PRICE_TYPE_OPTIONS.map((opt) => {
+                    const sel = (itemForm.price_type || 'exclusive') === opt.value
+                    return (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        title={opt.hint}
+                        onClick={() => setItemForm((p) => ({ ...p, price_type: opt.value }))}
+                        className={`rounded-xl border px-3 py-2.5 text-sm font-semibold transition ${
+                          sel
+                            ? 'border-transparent text-white'
+                            : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:border-slate-300 dark:hover:border-slate-600'
+                        }`}
+                        style={sel ? { backgroundColor: theme.accent } : undefined}
+                      >
+                        {opt.label}
+                      </button>
+                    )
+                  })}
+                </div>
+                <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">
+                  {(PRICE_TYPE_OPTIONS.find((o) => o.value === (itemForm.price_type || 'exclusive')) || {}).hint}
+                </p>
+              </div>
+
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="mb-1 block text-xs font-semibold text-slate-500 dark:text-slate-400">HSN Code</label>
@@ -883,22 +1029,40 @@ export default function AdminServices() {
                     </button>
                     <ChevronDown size={16} className={`pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 transition ${isVtItemDropdownOpen ? 'rotate-180' : ''}`} />
                     {isVtItemDropdownOpen ? (
-                      <div className="absolute left-0 right-0 z-[60] mt-2 max-h-56 overflow-auto rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-lg">
-                        {vehicleTypes.map((vt) => {
-                          const sel = (itemForm.applicable_vehicle_types || []).includes(vt.code)
-                          return (
-                            <button
-                              key={vt.id}
-                              type="button"
-                              onClick={() => toggleVtItem(vt.code)}
-                              className={`flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm transition ${sel ? 'font-semibold' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
-                              style={sel ? { backgroundColor: theme.accentSoft, color: theme.accent } : undefined}
-                            >
-                              {sel ? <Check size={14} /> : <span className="w-[14px]" />}
-                              <span className="min-w-0 flex-1 truncate">{vt.name}</span>
-                            </button>
-                          )
-                        })}
+                      <div className="absolute left-0 right-0 z-[60] mt-2 max-h-72 overflow-hidden rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-lg">
+                        <div className="sticky top-0 border-b border-slate-100 bg-white p-2 dark:border-slate-800 dark:bg-slate-900">
+                          <div className="relative">
+                            <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500" />
+                            <input
+                              autoFocus
+                              value={vtItemQuery}
+                              onChange={(e) => setVtItemQuery(e.target.value)}
+                              placeholder="Search vehicle types..."
+                              className="w-full rounded-lg border border-slate-200 bg-slate-50 py-1.5 pl-8 pr-2 text-sm text-slate-700 outline-none focus:border-slate-400 dark:border-slate-700 dark:bg-slate-950/50 dark:text-slate-100 dark:placeholder:text-slate-600"
+                            />
+                          </div>
+                        </div>
+                        <div className="max-h-56 overflow-auto">
+                          {vtItemOptions.length === 0 ? (
+                            <p className="px-3 py-3 text-xs text-slate-400 dark:text-slate-500">No vehicle types match.</p>
+                          ) : (
+                            vtItemOptions.map((vt) => {
+                              const sel = (itemForm.applicable_vehicle_types || []).includes(vt.code)
+                              return (
+                                <button
+                                  key={vt.id}
+                                  type="button"
+                                  onClick={() => toggleVtItem(vt.code)}
+                                  className={`flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm transition ${sel ? 'font-semibold' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
+                                  style={sel ? { backgroundColor: theme.accentSoft, color: theme.accent } : undefined}
+                                >
+                                  {sel ? <Check size={14} /> : <span className="w-[14px]" />}
+                                  <span className="min-w-0 flex-1 truncate">{vt.name}</span>
+                                </button>
+                              )
+                            })
+                          )}
+                        </div>
                       </div>
                     ) : null}
                   </div>

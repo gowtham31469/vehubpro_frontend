@@ -128,14 +128,10 @@ export default function PublicPortfolio() {
     return rows.sort((a, b) => b.count - a.count || a.name.localeCompare(b.name))
   }, [allBrands, vehicles])
 
-  // Brands with live inventory get the full logo-card treatment; a large
-  // catalog otherwise reads as a wall of identical letter circles, so
-  // everything else collapses into a compact text chip list instead.
+  // Only brands with live inventory get shown here — brand masters with zero
+  // current listings are catalog housekeeping, not something a visitor
+  // browsing available cars needs to see.
   const popularBrands = useMemo(() => brandCounts.filter((b) => b.count > 0), [brandCounts])
-  const otherBrands = useMemo(
-    () => brandCounts.filter((b) => b.count === 0).sort((a, b) => a.name.localeCompare(b.name)),
-    [brandCounts]
-  )
 
   const scrollToId = (id) => {
     document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' })
@@ -461,27 +457,29 @@ export default function PublicPortfolio() {
             <h2 className="text-center text-2xl font-extrabold uppercase tracking-tight text-white md:text-3xl">Explore Popular Brands</h2>
 
             {popularBrands.length > 0 ? (
-              <div className="mt-10 flex flex-wrap items-center justify-center gap-x-12 gap-y-8">
-                {popularBrands.map((b) => (
+              <div className="mt-10 grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
+                {/* brandCounts (and therefore popularBrands) is already sorted
+                    by count descending, so this is simply the top 12. */}
+                {popularBrands.slice(0, 12).map((b) => (
                   <Link
                     key={b.name}
                     to={`/portfolio/inventory?brand=${encodeURIComponent(b.name)}`}
-                    className="group flex flex-col items-center gap-2.5 text-center"
+                    className="group flex flex-col items-center gap-2.5 rounded-2xl border border-[#1A1A1A] bg-[#111111] px-4 py-6 text-center transition hover:border-[#3A3A3A] hover:bg-[#161616]"
                   >
                     {b.logoUrl ? (
-                      <span className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-full bg-white p-2 transition group-hover:scale-105">
+                      <span className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-full bg-white p-2 transition group-hover:scale-105">
                         <img src={b.logoUrl} alt={b.name} className="h-full w-full object-contain" />
                       </span>
                     ) : (
                       <span
-                        className="flex h-14 w-14 items-center justify-center rounded-full text-base font-bold transition group-hover:scale-105"
+                        className="flex h-12 w-12 items-center justify-center rounded-full text-base font-bold transition group-hover:scale-105"
                         style={{ backgroundColor: '#1A1A1A', color: '#9CA3AF' }}
                       >
                         {b.name.slice(0, 1).toUpperCase()}
                       </span>
                     )}
                     <span className="text-sm font-semibold text-white">{b.name}</span>
-                    <span className="text-xs font-semibold text-[#6B7280]">
+                    <span className="text-xs font-bold" style={{ color: theme.accent }}>
                       {b.count} {b.count === 1 ? 'car' : 'cars'}
                     </span>
                   </Link>
@@ -490,23 +488,6 @@ export default function PublicPortfolio() {
             ) : (
               <p className="mt-6 text-center text-sm text-[#6B7280]">No listings yet — check back soon.</p>
             )}
-
-            {otherBrands.length > 0 ? (
-              <div className="mx-auto mt-12 max-w-3xl border-t border-[#1A1A1A] pt-8 text-center">
-                <p className="text-xs font-bold uppercase tracking-wide text-[#6B7280]">Also dealing in</p>
-                <div className="mt-4 flex flex-wrap justify-center gap-2">
-                  {otherBrands.map((b) => (
-                    <Link
-                      key={b.name}
-                      to={`/portfolio/inventory?brand=${encodeURIComponent(b.name)}`}
-                      className="rounded-full border border-[#262626] px-3 py-1.5 text-xs font-semibold text-[#9CA3AF] transition hover:border-[#3A3A3A] hover:text-white"
-                    >
-                      {b.name}
-                    </Link>
-                  ))}
-                </div>
-              </div>
-            ) : null}
 
             <div className="mt-8 flex justify-center">
               <Link

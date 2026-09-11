@@ -18,13 +18,14 @@ export async function fetchFuelTypes() {
 }
 
 /** Tenant-scoped brands */
-export async function fetchBrands({ page = 1, pageSize = 10, isArchived = false, isActive } = {}) {
+export async function fetchBrands({ page = 1, pageSize = 10, isArchived = false, isActive, search = '' } = {}) {
   const params = new URLSearchParams({
     page: String(page),
     page_size: String(pageSize),
     is_archive: String(Boolean(isArchived)),
   })
   if (isActive !== undefined) params.set('is_active', String(Boolean(isActive)))
+  if (search.trim()) params.set('search', search.trim())
   return parseResponse(`/api/v1/vehicles/brands/?${params.toString()}`, { method: 'GET' }, 'Failed to fetch brands.')
 }
 
@@ -63,7 +64,7 @@ export async function deleteBrand(brandId) {
 }
 
 /** Tenant-scoped models */
-export async function fetchModels({ page = 1, pageSize = 10, brandId, isArchived = false, isActive } = {}) {
+export async function fetchModels({ page = 1, pageSize = 10, brandId, isArchived = false, isActive, search = '' } = {}) {
   const params = new URLSearchParams({
     page: String(page),
     page_size: String(pageSize),
@@ -71,6 +72,7 @@ export async function fetchModels({ page = 1, pageSize = 10, brandId, isArchived
   })
   if (brandId) params.set('brand_id', brandId)
   if (isActive !== undefined) params.set('is_active', String(Boolean(isActive)))
+  if (search.trim()) params.set('search', search.trim())
   return parseResponse(`/api/v1/vehicles/models/?${params.toString()}`, { method: 'GET' }, 'Failed to fetch models.')
 }
 
@@ -103,13 +105,14 @@ export async function deleteModel(modelId) {
 }
 
 /** Service vehicles (tenant-scoped) — list at GET /api/v1/vehicles/ */
-export async function fetchServiceVehicles({ page = 1, pageSize = 10, isArchived = false, customerId } = {}) {
+export async function fetchServiceVehicles({ page = 1, pageSize = 10, isArchived = false, customerId, search = '' } = {}) {
   const params = new URLSearchParams({
     page: String(page),
     page_size: String(pageSize),
     is_archive: String(Boolean(isArchived)),
   })
   if (customerId) params.set('customer_id', customerId)
+  if (search.trim()) params.set('search', search.trim())
   return parseResponse(`/api/v1/vehicles/?${params.toString()}`, { method: 'GET' }, 'Failed to fetch service vehicles.')
 }
 

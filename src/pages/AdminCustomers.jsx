@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   Download,
   Eye,
@@ -62,6 +62,7 @@ export default function AdminCustomers() {
   const [page, setPage] = useState(1)
   const [pageSize] = useState(10)
   const [searchText, setSearchText] = useState('')
+  const [debouncedSearchText, setDebouncedSearchText] = useState('')
   const [isLoading, setIsLoading] = useState(true)
   const [errorMessage, setErrorMessage] = useState('')
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -94,7 +95,7 @@ export default function AdminCustomers() {
     setIsLoading(true)
     setErrorMessage('')
     try {
-      const data = await fetchCustomers({ page: targetPage, pageSize })
+      const data = await fetchCustomers({ page: targetPage, pageSize, search: debouncedSearchText })
       setCustomersData(data)
     } catch (err) {
       if (err.message === 'SESSION_EXPIRED') {
@@ -108,23 +109,16 @@ export default function AdminCustomers() {
   }
 
   useEffect(() => {
+    const t = globalThis.setTimeout(() => setDebouncedSearchText(searchText), 300)
+    return () => globalThis.clearTimeout(t)
+  }, [searchText])
+
+  useEffect(() => {
     loadCustomers(1)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [debouncedSearchText])
 
-  const visibleCustomers = useMemo(() => {
-    const source = customersData.results || []
-    const query = searchText.trim().toLowerCase()
-    return source.filter((c) => {
-      const matchesSearch =
-        !query ||
-        c.full_name?.toLowerCase().includes(query) ||
-        c.email?.toLowerCase().includes(query) ||
-        c.phone?.toLowerCase().includes(query)
-
-      return matchesSearch
-    })
-  }, [customersData.results, searchText])
+  const visibleCustomers = customersData.results || []
 
   const openCreate = () => {
     setEditingCustomer(null)

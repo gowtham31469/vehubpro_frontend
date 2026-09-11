@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Car, Pencil, Plus, Search, Trash2, X } from 'lucide-react'
 import AdminShell from '../components/AdminShell'
@@ -24,17 +24,23 @@ export default function AdminInventoryVehicles() {
   const [listData, setListData] = useState({ count: 0, next: null, previous: null, results: [] })
   const [page, setPage] = useState(1)
   const [search, setSearch] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
   const [showArchived, setShowArchived] = useState(false)
   const [loading, setLoading] = useState(true)
   const [listError, setListError] = useState('')
   const [deleteTarget, setDeleteTarget] = useState(null)
+
+  useEffect(() => {
+    const t = globalThis.setTimeout(() => setDebouncedSearch(search), 300)
+    return () => globalThis.clearTimeout(t)
+  }, [search])
 
   const loadList = useCallback(
     async (p = 1) => {
       setLoading(true)
       setListError('')
       try {
-        const data = await fetchInventoryVehicles({ page: p, pageSize: 10, isArchived: showArchived })
+        const data = await fetchInventoryVehicles({ page: p, pageSize: 10, isArchived: showArchived, search: debouncedSearch })
         setListData(data)
         setPage(p)
       } catch (e) {
@@ -47,24 +53,14 @@ export default function AdminInventoryVehicles() {
         setLoading(false)
       }
     },
-    [showArchived],
+    [showArchived, debouncedSearch],
   )
 
   useEffect(() => {
     loadList(1)
-  }, [loadList, showArchived])
+  }, [loadList, showArchived, debouncedSearch])
 
-  const filteredRows = useMemo(() => {
-    const q = search.trim().toLowerCase()
-    const rows = listData.results || []
-    if (!q) return rows
-    return rows.filter(
-      (r) =>
-        r.vehicle_model_name?.toLowerCase().includes(q) ||
-        r.brand_name?.toLowerCase().includes(q) ||
-        r.registration_no?.toLowerCase().includes(q),
-    )
-  }, [listData.results, search])
+  const rows = listData.results || []
 
   const confirmDelete = async () => {
     if (!deleteTarget?.id) return
@@ -143,12 +139,12 @@ export default function AdminInventoryVehicles() {
                     <tr>
                       <td colSpan={6} className="px-6 py-10 text-slate-500 dark:text-slate-400">Loading…</td>
                     </tr>
-                  ) : filteredRows.length === 0 ? (
+                  ) : rows.length === 0 ? (
                     <tr>
                       <td colSpan={6} className="px-6 py-10 text-slate-500 dark:text-slate-400">No inventory vehicles found.</td>
                     </tr>
                   ) : (
-                    filteredRows.map((r) => {
+                    rows.map((r) => {
                       const thumb = r.photo_urls?.[0]?.url
                       return (
                         <tr key={r.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40">
@@ -199,7 +195,7 @@ export default function AdminInventoryVehicles() {
               </table>
             </div>
             <div className="flex items-center justify-between border-t border-slate-200 px-6 py-4 text-sm text-slate-500 dark:border-slate-800/60 dark:text-slate-400">
-              <p>Showing {filteredRows.length} of {listData.count} listings</p>
+              <p>Showing {rows.length} of {listData.count} listings</p>
               <div className="flex items-center gap-2">
                 <button
                   type="button"
