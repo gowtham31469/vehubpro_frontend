@@ -49,7 +49,7 @@ function validateForm(email, password) {
 }
 
 export default function AdminLogin() {
-  const { theme, branding, tenantName, tenantError, refresh: refreshBranding } = useTenantBranding()
+  const { theme, branding, tenantName, refresh: refreshBranding } = useTenantBranding()
   const navigate = useNavigate()
   const [showPassword, setShowPassword] = useState(false)
   const [email, setEmail] = useState('')
@@ -130,57 +130,11 @@ export default function AdminLogin() {
     return null
   }
 
-  // Show elegant error page if tenant not found
-  if (tenantError) {
-    return (
-      <div className="bg-white text-slate-900 font-display">
-        <div className="flex h-screen overflow-hidden">
-          <div className="flex h-full w-full flex-col items-center justify-center px-6 py-8">
-            <div className="mx-auto w-full max-w-md text-center">
-              <div className="mb-6">
-                <div className="mb-4 text-6xl">🏢</div>
-                <h1 className="text-3xl font-bold text-slate-900">Tenant Not Found</h1>
-                <p className="mt-4 text-slate-500">
-                  The organization you're trying to access isn't registered with us yet.
-                </p>
-              </div>
-
-              <div className="space-y-4 rounded-lg bg-slate-50 p-6 text-left">
-                <div>
-                  <p className="text-sm font-semibold text-slate-700">What happened?</p>
-                  <p className="mt-1 text-sm text-slate-600">
-                    We couldn't find an active tenant for this domain. Please verify that:
-                  </p>
-                  <ul className="mt-2 list-inside list-disc space-y-1 text-sm text-slate-600">
-                    <li>The domain is correct</li>
-                    <li>Your organization is registered</li>
-                    <li>Your subscription is active</li>
-                  </ul>
-                </div>
-              </div>
-
-              <div className="mt-8">
-                <p className="text-sm text-slate-500">
-                  Need help? Contact support at{' '}
-                  <a href="mailto:support@vehubpro.com" className="font-medium text-blue-600 hover:text-blue-700">
-                    support@vehubpro.com
-                  </a>
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="relative hidden w-0 flex-1 overflow-hidden lg:block">
-            <img
-              className="absolute inset-0 h-full w-full object-cover object-center"
-              src={loginSideImage}
-              alt="Service center"
-            />
-          </div>
-        </div>
-      </div>
-    )
-  }
+  // Note: unlike the public portfolio pages, admin login deliberately does
+  // NOT gate on tenantError — staff must always be able to reach /admin and
+  // sign in even when the subdomain's public branding lookup fails (tenant
+  // inactive, portfolio module off, etc.). It just falls back to generic
+  // "Staff Login" branding below when no tenant name was resolved.
 
   return (
     <div className="bg-white text-slate-900 font-display">
