@@ -68,6 +68,37 @@ function vehicleToForm(v, y0) {
   }
 }
 
+function FeatureCheckboxGrid({ features, selectedIds, onToggle, theme }) {
+  return (
+    <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+      {features.map((feature) => {
+        const active = selectedIds.includes(String(feature.id))
+        return (
+          <button
+            key={feature.id}
+            type="button"
+            onClick={() => onToggle(feature.id)}
+            className="flex items-center gap-2 rounded-xl border px-3 py-2.5 text-left text-sm font-medium transition"
+            style={
+              active
+                ? { borderColor: theme.accent, backgroundColor: theme.accentSoft, color: theme.accent }
+                : undefined
+            }
+          >
+            <span
+              className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full border ${active ? '' : 'border-slate-300 dark:border-slate-600'}`}
+              style={active ? { borderColor: theme.accent, backgroundColor: theme.accent } : undefined}
+            >
+              {active ? <span className="h-1.5 w-1.5 rounded-full bg-white" /> : null}
+            </span>
+            <span className={active ? '' : 'text-slate-600 dark:text-slate-300'}>{feature.name}</span>
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
 function SectionCard({ step, title, children }) {
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800/60 dark:bg-slate-900/40 md:p-6">
@@ -180,6 +211,8 @@ export default function AdminInventoryVehicleForm() {
     .filter((t) => BODY_TYPE_CODES.has(t.code))
     .map((t) => ({ id: t.id, name: t.name }))
   const fuelTypeOptions = fuelTypes.map((f) => ({ id: f.id, name: f.name }))
+  const safetyFeatures = features.filter((f) => f.category === 'safety')
+  const generalFeatures = features.filter((f) => f.category !== 'safety')
 
   const toggleFeature = (featureId) => {
     const key = String(featureId)
@@ -431,7 +464,7 @@ export default function AdminInventoryVehicleForm() {
                 </div>
               </div>
               <div>
-                <label className={labelCls}>Mileage (KM)</label>
+                <label className={labelCls}>Kms Driven</label>
                 <div className="flex overflow-hidden rounded-xl border border-slate-200 bg-white focus-within:border-slate-300 dark:border-slate-800 dark:bg-slate-950/50">
                   <input
                     type="number"
@@ -445,39 +478,37 @@ export default function AdminInventoryVehicleForm() {
               </div>
             </div>
 
-            <div className="mt-4">
-              <label className={labelCls}>Key Features</label>
+            <div className="mt-4 space-y-4">
+              <label className={labelCls}>Safety & Features</label>
               {features.length === 0 ? (
                 <p className="text-sm text-slate-400 dark:text-slate-500">
                   No key features configured yet. Add some under Configuration {'>'} Key Features.
                 </p>
               ) : (
-                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                  {features.map((feature) => {
-                    const active = form.key_features.includes(String(feature.id))
-                    return (
-                      <button
-                        key={feature.id}
-                        type="button"
-                        onClick={() => toggleFeature(feature.id)}
-                        className="flex items-center gap-2 rounded-xl border px-3 py-2.5 text-left text-sm font-medium transition"
-                        style={
-                          active
-                            ? { borderColor: theme.accent, backgroundColor: theme.accentSoft, color: theme.accent }
-                            : undefined
-                        }
-                      >
-                        <span
-                          className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full border ${active ? '' : 'border-slate-300 dark:border-slate-600'}`}
-                          style={active ? { borderColor: theme.accent, backgroundColor: theme.accent } : undefined}
-                        >
-                          {active ? <span className="h-1.5 w-1.5 rounded-full bg-white" /> : null}
-                        </span>
-                        <span className={active ? '' : 'text-slate-600 dark:text-slate-300'}>{feature.name}</span>
-                      </button>
-                    )
-                  })}
-                </div>
+                <>
+                  {safetyFeatures.length > 0 ? (
+                    <div>
+                      <p className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500">Safety</p>
+                      <FeatureCheckboxGrid
+                        features={safetyFeatures}
+                        selectedIds={form.key_features}
+                        onToggle={toggleFeature}
+                        theme={theme}
+                      />
+                    </div>
+                  ) : null}
+                  {generalFeatures.length > 0 ? (
+                    <div>
+                      <p className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500">Features</p>
+                      <FeatureCheckboxGrid
+                        features={generalFeatures}
+                        selectedIds={form.key_features}
+                        onToggle={toggleFeature}
+                        theme={theme}
+                      />
+                    </div>
+                  ) : null}
+                </>
               )}
             </div>
           </SectionCard>

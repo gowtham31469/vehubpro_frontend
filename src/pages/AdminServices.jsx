@@ -17,6 +17,13 @@ import {
   uploadServiceItemImage,
 } from '../utils/services'
 
+// Body-type rows (see backend/apps/platform/vehicles/migrations/0011_seed_body_type_vehicle_types.py)
+// belong to the Inventory listing's "Body Type" field only — a category or
+// service item's "applicable vehicle types" picker should offer generic
+// categories (Car, Bus, Van, ...), not Hatchback/SUV/etc. Mirrored in
+// AdminServiceVehicleForm.jsx and AdminInventoryVehicleForm.jsx.
+const BODY_TYPE_CODES = new Set(['hatchback', 'sedan', 'suv', 'muv', 'luxury_sedan', 'luxury_suv'])
+
 const emptyCategory = { name: '', applicable_vehicle_types: [], is_active: true }
 const SERVICE_TYPE_OPTIONS = [
   { value: 'labour', label: 'Labour' },
@@ -41,6 +48,12 @@ export default function AdminServices() {
       .then((data) => setVehicleTypes(Array.isArray(data) ? data : []))
       .catch(() => setVehicleTypes([]))
   }, [])
+
+  // What the pickers below offer as *new* selections — excludes body types.
+  // Lookups that display an already-saved code's name still use the raw
+  // `vehicleTypes` list, so a category saved with a body-type code (from
+  // before this restriction) keeps showing its name correctly.
+  const genericVehicleTypes = useMemo(() => vehicleTypes.filter((vt) => !BODY_TYPE_CODES.has(vt.code)), [vehicleTypes])
 
   /* ------------------------------------------------------------------ */
   /* Categories                                                          */
@@ -77,9 +90,9 @@ export default function AdminServices() {
 
   const vtCatOptions = useMemo(() => {
     const q = vtCatQuery.trim().toLowerCase()
-    if (!q) return vehicleTypes
-    return vehicleTypes.filter((vt) => vt.name?.toLowerCase().includes(q))
-  }, [vehicleTypes, vtCatQuery])
+    if (!q) return genericVehicleTypes
+    return genericVehicleTypes.filter((vt) => vt.name?.toLowerCase().includes(q))
+  }, [genericVehicleTypes, vtCatQuery])
 
   const loadCategories = useCallback(async (page = 1) => {
     setCatLoading(true)
@@ -228,9 +241,9 @@ export default function AdminServices() {
 
   const vtItemOptions = useMemo(() => {
     const q = vtItemQuery.trim().toLowerCase()
-    if (!q) return vehicleTypes
-    return vehicleTypes.filter((vt) => vt.name?.toLowerCase().includes(q))
-  }, [vehicleTypes, vtItemQuery])
+    if (!q) return genericVehicleTypes
+    return genericVehicleTypes.filter((vt) => vt.name?.toLowerCase().includes(q))
+  }, [genericVehicleTypes, vtItemQuery])
 
   const sortedCategories = useMemo(() => {
     const rows = catAll || []

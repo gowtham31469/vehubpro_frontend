@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ArrowLeft, Banknote, Download, FileWarning, Loader2, ReceiptText, Wallet } from 'lucide-react'
+import { ArrowLeft, Banknote, Download, FileWarning, Loader2, Package, ReceiptText, Wallet, Wrench } from 'lucide-react'
 import AdminShell from '../components/AdminShell'
 import { useTenantBranding } from '../context/TenantBrandingContext.jsx'
 import { useToast } from '../context/ToastContext.jsx'
@@ -227,9 +227,11 @@ export default function AdminInvoiceReport() {
           <>
             {/* KPI summary — computed in the database, so this stays accurate and fast
                 even when the matching row count is far larger than what's shown below. */}
-            <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+            <div className="grid grid-cols-2 gap-4 lg:grid-cols-3 xl:grid-cols-6">
               <KpiCard icon={ReceiptText} label="Invoices" value={summary.count.toLocaleString('en-IN')} accent={theme.accent} accentSoft={theme.accentSoft} />
               <KpiCard icon={Banknote} label="Total Invoiced" value={fmtMoney(summary.total_invoiced)} accent={theme.accent} accentSoft={theme.accentSoft} />
+              <KpiCard icon={Wrench} label="Labour Amount" value={fmtMoney(summary.total_labour)} accent="#7c3aed" accentSoft="rgba(124,58,237,0.12)" />
+              <KpiCard icon={Package} label="Parts Amount" value={fmtMoney(summary.total_parts)} accent="#0891b2" accentSoft="rgba(8,145,178,0.12)" />
               <KpiCard icon={Wallet} label="Total Collected" value={fmtMoney(summary.total_collected)} accent="#059669" accentSoft="rgba(5,150,105,0.12)" />
               <KpiCard icon={FileWarning} label="Outstanding" value={fmtMoney(summary.total_outstanding)} accent="#e11d48" accentSoft="rgba(225,29,72,0.12)" />
             </div>

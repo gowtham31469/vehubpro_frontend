@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Car, Gauge, Fuel, Cog, Search, ShieldCheck, Sparkles, ChevronRight } from 'lucide-react'
+import { Car, Gauge, Fuel, Cog, Search, ShieldCheck, Sparkles, ChevronLeft, ChevronRight } from 'lucide-react'
 import { useTenantBranding } from '../context/TenantBrandingContext.jsx'
 import { useToast } from '../context/ToastContext.jsx'
 import { fetchPublicInventoryVehicles, fetchPublicVehicleBrands } from '../utils/publicPortfolio'
@@ -320,14 +320,24 @@ export default function PublicPortfolio() {
                 ))}
               </div>
               {featuredVehicles.length > 3 ? (
-                <button
-                  type="button"
-                  onClick={() => scrollFeatured(1)}
-                  className="absolute -right-4 top-1/3 hidden h-10 w-10 items-center justify-center rounded-full border border-[#262626] bg-[#141414] text-[#9CA3AF] shadow-lg transition hover:text-white md:flex"
-                  aria-label="Scroll right"
-                >
-                  <ChevronRight size={18} />
-                </button>
+                <>
+                  <button
+                    type="button"
+                    onClick={() => scrollFeatured(-1)}
+                    className="absolute -left-4 top-1/3 flex h-10 w-10 items-center justify-center rounded-full border border-[#262626] bg-[#141414] text-[#9CA3AF] shadow-lg transition hover:text-white"
+                    aria-label="Scroll left"
+                  >
+                    <ChevronLeft size={18} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => scrollFeatured(1)}
+                    className="absolute -right-4 top-1/3 flex h-10 w-10 items-center justify-center rounded-full border border-[#262626] bg-[#141414] text-[#9CA3AF] shadow-lg transition hover:text-white"
+                    aria-label="Scroll right"
+                  >
+                    <ChevronRight size={18} />
+                  </button>
+                </>
               ) : null}
             </div>
 

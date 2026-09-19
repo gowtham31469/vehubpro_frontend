@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { BadgeCheck, Package, Users, WalletCards, Wrench } from 'lucide-react'
+import { BadgeCheck, Briefcase, CarFront, CheckCircle2, Package, Tag, Users, Wallet, WalletCards, Wrench } from 'lucide-react'
 import AdminShell from '../components/AdminShell'
 import { useTenantBranding } from '../context/TenantBrandingContext.jsx'
 import { hexToRgba } from '../utils/themeColors'
@@ -10,6 +10,21 @@ import {
   fetchRecentActivity,
   fetchRevenueTrend,
 } from '../utils/dashboard'
+import { fetchPortfolioDashboardSummary } from '../utils/inventoryVehicles'
+import { fetchUserNavModules } from '../utils/modules'
+
+// Same sessionStorage entry AdminShell.jsx populates (cleared on logout) —
+// read-only here, so there's no risk of the two caches disagreeing about
+// what's in it; worst case this page does one extra /modules/me/ fetch.
+const NAV_CACHE_KEY = 'vehubpro_nav_modules'
+
+// Which nav module keys count as "this tenant runs the Service side of the
+// business" for picking which dashboard sections to show — 'portfolio' is
+// the only key on the other side of that split. See MODULE_META in
+// AdminShell.jsx for the full key list.
+const SERVICE_MODULE_KEYS = new Set([
+  'customers', 'customer_management', 'service-vehicles', 'job-cards', 'invoices', 'quotations', 'services',
+])
 
 // ── Formatters ────────────────────────────────────────────────────────────────
 
@@ -78,13 +93,47 @@ function Skeleton({ className }) {
 export default function AdminDashboard() {
   const { theme } = useTenantBranding()
 
+  // null = still resolving which modules this tenant has; the two dashboard
+  // sections below only start fetching once this settles, so neither one
+  // flashes and then disappears.
+  const [moduleKeys, setModuleKeys] = useState(() => {
+    try {
+      const raw = sessionStorage.getItem(NAV_CACHE_KEY)
+      const parsed = raw ? JSON.parse(raw) : null
+      return Array.isArray(parsed) ? parsed.map((m) => m.key) : null
+    } catch { return null }
+  })
+
   const [summary, setSummary]   = useState(null)
   const [trend, setTrend]       = useState([])
   const [funnel, setFunnel]     = useState([])
   const [recent, setRecent]     = useState([])
   const [loading, setLoading]   = useState(true)
 
+  const [portfolioSummary, setPortfolioSummary] = useState(null)
+  const [portfolioLoading, setPortfolioLoading] = useState(true)
+
   useEffect(() => {
+    if (moduleKeys) return
+    let cancelled = false
+    fetchUserNavModules()
+      .then((modules) => {
+        if (cancelled) return
+        setModuleKeys(Array.isArray(modules) ? modules.map((m) => m.key) : [])
+      })
+      .catch((e) => {
+        if (cancelled) return
+        if (e.message === 'SESSION_EXPIRED') { globalThis.location.href = '/admin'; return }
+        setModuleKeys([]) // unknown — render neither section rather than guessing
+      })
+    return () => { cancelled = true }
+  }, [moduleKeys])
+
+  const hasServices = Boolean(moduleKeys?.some((k) => SERVICE_MODULE_KEYS.has(k)))
+  const hasPortfolio = Boolean(moduleKeys?.includes('portfolio'))
+
+  useEffect(() => {
+    if (!moduleKeys || !hasServices) { setLoading(false); return }
     let cancelled = false
 
     async function load() {
@@ -110,7 +159,20 @@ export default function AdminDashboard() {
 
     void load()
     return () => { cancelled = true }
-  }, [])
+  }, [moduleKeys, hasServices])
+
+  useEffect(() => {
+    if (!moduleKeys || !hasPortfolio) { setPortfolioLoading(false); return }
+    let cancelled = false
+    fetchPortfolioDashboardSummary()
+      .then((data) => { if (!cancelled) setPortfolioSummary(data) })
+      .catch((e) => {
+        if (cancelled) return
+        if (e.message === 'SESSION_EXPIRED') { globalThis.location.href = '/admin'; return }
+      })
+      .finally(() => { if (!cancelled) setPortfolioLoading(false) })
+    return () => { cancelled = true }
+  }, [moduleKeys, hasPortfolio])
 
   // ── Derived values ──────────────────────────────────────────────────────────
   const funnelMap    = Object.fromEntries(funnel.map((f) => [f.status, f.count]))
@@ -132,6 +194,18 @@ export default function AdminDashboard() {
             <h2 className="text-3xl font-bold text-slate-900 dark:text-white">Dashboard Overview</h2>
             <p className="mt-1 text-slate-500 dark:text-slate-400">Here&apos;s what&apos;s happening today.</p>
           </div>
+
+          {moduleKeys && !hasServices && !hasPortfolio ? (
+            <div className="rounded-2xl border border-slate-200 bg-white p-10 text-center text-sm text-slate-500 shadow-sm dark:border-slate-800/60 dark:bg-slate-900/40 dark:text-slate-400">
+              No modules are enabled for this account yet — ask an admin to grant access under Configuration.
+            </div>
+          ) : null}
+
+          {hasServices ? (
+            <>
+          {hasPortfolio ? (
+            <h3 className="text-lg font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">Service Operations</h3>
+          ) : null}
 
           {/* ── KPI cards ── */}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
@@ -313,6 +387,43 @@ export default function AdminDashboard() {
               </table>
             </div>
           </div>
+            </>
+          ) : null}
+
+          {hasPortfolio ? (
+            <>
+          {hasServices ? (
+            <h3 className="pt-2 text-lg font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">Portfolio Overview</h3>
+          ) : null}
+
+          {/* ── Portfolio KPI cards ── */}
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
+            {[
+              { label: 'Total Listings',  value: fmtCount(portfolioSummary?.total_listings), Icon: Briefcase },
+              { label: 'Available',       value: fmtCount(portfolioSummary?.available),       Icon: CarFront },
+              { label: 'Booked',          value: fmtCount(portfolioSummary?.booked),           Icon: Tag },
+              { label: 'Sold',            value: fmtCount(portfolioSummary?.sold),             Icon: CheckCircle2 },
+              { label: 'Inventory Value', value: fmtMoney(portfolioSummary?.available_inventory_value), Icon: Wallet },
+            ].map(({ label, value, Icon }) => (
+              <div key={label} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm backdrop-blur-sm dark:border-slate-800/60 dark:bg-slate-900/40">
+                <div className="mb-4 flex items-center justify-between">
+                  <div
+                    className="flex h-10 w-10 items-center justify-center rounded-xl"
+                    style={{ backgroundColor: theme.accentSoft, color: theme.accent }}
+                  >
+                    <Icon size={20} strokeWidth={2.2} />
+                  </div>
+                </div>
+                <p className="text-sm font-medium text-slate-500 dark:text-slate-400">{label}</p>
+                {portfolioLoading
+                  ? <Skeleton className="mt-2 h-10 w-24" />
+                  : <p className="mt-1 text-4xl font-bold text-slate-900 dark:text-white">{value}</p>
+                }
+              </div>
+            ))}
+          </div>
+            </>
+          ) : null}
 
         </div>
       </AdminShell>

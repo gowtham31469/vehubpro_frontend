@@ -16,6 +16,12 @@ import {
   updateServiceVehicle,
 } from '../utils/vehicles'
 
+// Body-type rows (see backend/apps/platform/vehicles/migrations/0011_seed_body_type_vehicle_types.py)
+// belong to the Inventory listing's "Body Type" field, not here — a customer's
+// service vehicle is a generic category (Car, Bus, Van, ...), never "Hatchback"
+// or "SUV". Mirrored in AdminInventoryVehicleForm.jsx's BODY_TYPE_CODES.
+const BODY_TYPE_CODES = new Set(['hatchback', 'sedan', 'suv', 'muv', 'luxury_sedan', 'luxury_suv'])
+
 function emptyForm(y0) {
   return {
     customer: '',
@@ -225,8 +231,13 @@ export default function AdminServiceVehicleForm() {
     [],
   )
 
+  const vehicleTypeOptions = useMemo(() => vehicleTypes.filter((t) => !BODY_TYPE_CODES.has(t.code)), [vehicleTypes])
+
   const selectedCustomer = useMemo(() => customers.find((c) => String(c.id) === String(form.customer)), [customers, form.customer])
-  const selectedVehicleType = useMemo(() => vehicleTypes.find((t) => String(t.id) === String(form.vehicle_type)), [vehicleTypes, form.vehicle_type])
+  const selectedVehicleType = useMemo(
+    () => vehicleTypeOptions.find((t) => String(t.id) === String(form.vehicle_type)),
+    [vehicleTypeOptions, form.vehicle_type],
+  )
   const selectedFuelType = useMemo(() => fuelTypes.find((t) => String(t.id) === String(form.fuel_type)), [fuelTypes, form.fuel_type])
   const selectedBrand = useMemo(() => brands.find((b) => String(b.id) === String(form.brand)), [brands, form.brand])
   const selectedModel = useMemo(() => modelsForBrand.find((m) => String(m.id) === String(form.vehicle_model)), [modelsForBrand, form.vehicle_model])
@@ -453,10 +464,10 @@ export default function AdminServiceVehicleForm() {
                           >
                             Select type
                           </DropdownItem>
-                          {filterByName(vehicleTypes, query).length === 0 ? (
+                          {filterByName(vehicleTypeOptions, query).length === 0 ? (
                             <p className="px-3 py-3 text-xs text-slate-400 dark:text-slate-500">No vehicle types match.</p>
                           ) : (
-                            filterByName(vehicleTypes, query).map((t) => (
+                            filterByName(vehicleTypeOptions, query).map((t) => (
                               <DropdownItem
                                 key={t.id}
                                 selected={String(form.vehicle_type) === String(t.id)}

@@ -128,6 +128,7 @@ export default function AdminInventoryVehicles() {
                   <tr>
                     <th className="px-6 py-4">Vehicle</th>
                     <th className="px-6 py-4">Year</th>
+                    <th className="px-6 py-4">Kms Driven</th>
                     <th className="px-6 py-4">Fuel / Transmission</th>
                     <th className="px-6 py-4">Price</th>
                     <th className="px-6 py-4">Status</th>
@@ -137,11 +138,11 @@ export default function AdminInventoryVehicles() {
                 <tbody className="divide-y divide-slate-100 text-sm dark:divide-slate-800/60">
                   {loading ? (
                     <tr>
-                      <td colSpan={6} className="px-6 py-10 text-slate-500 dark:text-slate-400">Loading…</td>
+                      <td colSpan={7} className="px-6 py-10 text-slate-500 dark:text-slate-400">Loading…</td>
                     </tr>
                   ) : rows.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="px-6 py-10 text-slate-500 dark:text-slate-400">No inventory vehicles found.</td>
+                      <td colSpan={7} className="px-6 py-10 text-slate-500 dark:text-slate-400">No inventory vehicles found.</td>
                     </tr>
                   ) : (
                     rows.map((r) => {
@@ -164,6 +165,7 @@ export default function AdminInventoryVehicles() {
                             </div>
                           </td>
                           <td className="px-6 py-3 text-slate-700 dark:text-slate-300">{r.year}</td>
+                          <td className="px-6 py-3 text-slate-700 dark:text-slate-300">{Number(r.mileage_km || 0).toLocaleString('en-IN')} km</td>
                           <td className="px-6 py-3 text-slate-600 dark:text-slate-400">
                             {r.fuel_type_name || '—'} · {r.transmission === 'manual' ? 'Manual' : 'Automatic'}
                           </td>

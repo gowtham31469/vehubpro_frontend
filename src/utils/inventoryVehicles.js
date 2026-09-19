@@ -95,3 +95,7 @@ export async function updateInventoryFeature(id, payload) {
 export async function deleteInventoryFeature(id) {
   return parseResponse(`/api/v1/portfolio/inventory-features/${id}/`, { method: 'DELETE' }, 'Failed to delete key feature.')
 }
+
+export async function fetchPortfolioDashboardSummary() {
+  return parseResponse('/api/v1/portfolio/dashboard-summary/', { method: 'GET' }, 'Failed to fetch portfolio dashboard summary.')
+}
