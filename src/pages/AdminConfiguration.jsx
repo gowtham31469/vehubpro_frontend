@@ -24,11 +24,25 @@ import {
 
 const emptyBrand = { name: '', is_active: true, logo_url: null, logo_file: null }
 const emptyModel = { brand: '', vehicle_type: '', name: '', is_active: true }
-const emptyFeature = { name: '', category: 'feature', is_active: true }
+const emptyFeature = { name: '', category: 'comfort_convenience', is_active: true }
+// Mirrors InventoryFeature.CATEGORY_CHOICES in backend/apps/platform/portfolio/models.py.
 const FEATURE_CATEGORY_OPTIONS = [
+  { value: 'comfort_convenience', label: 'Comfort & Convenience' },
   { value: 'safety', label: 'Safety' },
-  { value: 'feature', label: 'Feature' },
+  { value: 'entertainment_communication', label: 'Entertainment & Communication' },
+  { value: 'exterior', label: 'Exterior' },
+  { value: 'interior', label: 'Interior' },
 ]
+const FEATURE_CATEGORY_BADGE_STYLES = {
+  comfort_convenience: 'bg-sky-50 text-sky-700 dark:bg-sky-500/10 dark:text-sky-400',
+  safety: 'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400',
+  entertainment_communication: 'bg-violet-50 text-violet-700 dark:bg-violet-500/10 dark:text-violet-400',
+  exterior: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400',
+  interior: 'bg-rose-50 text-rose-700 dark:bg-rose-500/10 dark:text-rose-400',
+}
+function featureCategoryLabel(value) {
+  return FEATURE_CATEGORY_OPTIONS.find((o) => o.value === value)?.label || value
+}
 
 export default function AdminConfiguration() {
   const { theme } = useTenantBranding()
@@ -226,7 +240,7 @@ export default function AdminConfiguration() {
   }
   const openFeatureEdit = (f) => {
     setFeatureModalError('')
-    setFeatureForm({ name: f.name || '', category: f.category || 'feature', is_active: Boolean(f.is_active) })
+    setFeatureForm({ name: f.name || '', category: f.category || 'comfort_convenience', is_active: Boolean(f.is_active) })
     setFeatureModal({ type: 'edit', id: f.id })
   }
   const closeFeatureModal = () => {
@@ -838,8 +852,8 @@ export default function AdminConfiguration() {
                           <tr key={f.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40">
                             <td className="px-6 py-3 font-medium text-slate-900 dark:text-white">{f.name}</td>
                             <td className="px-6 py-3">
-                              <span className={`rounded-full px-2.5 py-1 text-xs font-semibold capitalize ${f.category === 'safety' ? 'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400' : 'bg-sky-50 text-sky-700 dark:bg-sky-500/10 dark:text-sky-400'}`}>
-                                {f.category === 'safety' ? 'Safety' : 'Feature'}
+                              <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${FEATURE_CATEGORY_BADGE_STYLES[f.category] || FEATURE_CATEGORY_BADGE_STYLES.comfort_convenience}`}>
+                                {featureCategoryLabel(f.category)}
                               </span>
                             </td>
                             <td className="px-6 py-3">
@@ -1215,7 +1229,7 @@ export default function AdminConfiguration() {
 
               <div>
                 <label className="mb-1 block text-xs font-semibold text-slate-500 dark:text-slate-400">Category</label>
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                   {FEATURE_CATEGORY_OPTIONS.map((opt) => {
                     const sel = featureForm.category === opt.value
                     return (
@@ -1223,7 +1237,7 @@ export default function AdminConfiguration() {
                         key={opt.value}
                         type="button"
                         onClick={() => setFeatureForm((p) => ({ ...p, category: opt.value }))}
-                        className={`rounded-xl border px-3 py-2.5 text-sm font-semibold transition ${
+                        className={`rounded-xl border px-3 py-2.5 text-left text-sm font-semibold transition ${
                           sel
                             ? 'border-transparent text-white'
                             : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:border-slate-300 dark:hover:border-slate-600'

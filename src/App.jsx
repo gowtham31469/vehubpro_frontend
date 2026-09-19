@@ -22,6 +22,7 @@ import AdminInventoryVehicles from './pages/AdminInventoryVehicles'
 import AdminInventoryVehicleForm from './pages/AdminInventoryVehicleForm'
 import PublicPortfolio from './pages/PublicPortfolio'
 import PublicInventoryListing from './pages/PublicInventoryListing'
+import PublicVehicleDetail from './pages/PublicVehicleDetail'
 import PublicContact from './pages/PublicContact'
 import { isAuthenticated } from './utils/apiClient'
 
@@ -38,6 +39,7 @@ export default function App() {
       <Route path="/admin" element={<AdminLogin />} />
       <Route path="/portfolio" element={<PublicPortfolio />} />
       <Route path="/portfolio/inventory" element={<PublicInventoryListing />} />
+      <Route path="/portfolio/inventory/:id" element={<PublicVehicleDetail />} />
       <Route path="/portfolio/contact" element={<PublicContact />} />
       <Route element={<RequireAuth />}>
         <Route path="/admin/insights" element={<AdminInsights />} />

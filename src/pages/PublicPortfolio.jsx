@@ -307,14 +307,13 @@ export default function PublicPortfolio() {
                           {v.fuel_type_name}
                         </div>
                       </div>
-                      <button
-                        type="button"
-                        onClick={handleContactClick}
-                        className="mt-4 w-full rounded-xl py-2 text-sm font-bold text-white transition hover:opacity-90"
+                      <Link
+                        to={`/portfolio/inventory/${v.id}`}
+                        className="mt-4 flex w-full items-center justify-center rounded-xl py-2 text-sm font-bold text-white transition hover:opacity-90"
                         style={{ backgroundColor: theme.accent }}
                       >
                         View Details
-                      </button>
+                      </Link>
                     </div>
                   </div>
                 ))}

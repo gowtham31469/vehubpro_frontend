@@ -15,6 +15,16 @@ import {
 
 const BODY_TYPE_CODES = new Set(['hatchback', 'sedan', 'suv', 'muv', 'luxury_sedan', 'luxury_suv'])
 
+// Mirrors InventoryFeature.CATEGORY_CHOICES in backend/apps/platform/portfolio/models.py
+// (also duplicated in AdminConfiguration.jsx) — order here is the display order below.
+const FEATURE_CATEGORY_ORDER = [
+  { value: 'comfort_convenience', label: 'Comfort & Convenience' },
+  { value: 'safety', label: 'Safety' },
+  { value: 'entertainment_communication', label: 'Entertainment & Communication' },
+  { value: 'exterior', label: 'Exterior' },
+  { value: 'interior', label: 'Interior' },
+]
+
 // A fixed palette, not tenant-managed master data — mirrors
 // InventoryVehicle.COLOR_CHOICES in backend/apps/platform/portfolio/models.py.
 // Keep the `code`s in sync if that list changes.
@@ -44,6 +54,9 @@ function emptyForm(y0) {
     mileage_km: '',
     key_features: [],
     listing_price: '',
+    original_price: '',
+    offer_valid_until: '',
+    reasons_to_buy: [],
     insurance_policy_no: '',
     registration_no: '',
     tax_expiration_date: '',
@@ -62,6 +75,9 @@ function vehicleToForm(v, y0) {
     mileage_km: v.mileage_km ?? '',
     key_features: (v.key_features || []).map(String),
     listing_price: v.listing_price ?? '',
+    original_price: v.original_price ?? '',
+    offer_valid_until: v.offer_valid_until || '',
+    reasons_to_buy: Array.isArray(v.reasons_to_buy) ? v.reasons_to_buy : [],
     insurance_policy_no: v.insurance_policy_no || '',
     registration_no: v.registration_no || '',
     tax_expiration_date: v.tax_expiration_date || '',
@@ -211,8 +227,9 @@ export default function AdminInventoryVehicleForm() {
     .filter((t) => BODY_TYPE_CODES.has(t.code))
     .map((t) => ({ id: t.id, name: t.name }))
   const fuelTypeOptions = fuelTypes.map((f) => ({ id: f.id, name: f.name }))
-  const safetyFeatures = features.filter((f) => f.category === 'safety')
-  const generalFeatures = features.filter((f) => f.category !== 'safety')
+  const featureGroups = FEATURE_CATEGORY_ORDER
+    .map((cat) => ({ ...cat, features: features.filter((f) => f.category === cat.value) }))
+    .filter((group) => group.features.length > 0)
 
   const toggleFeature = (featureId) => {
     const key = String(featureId)
@@ -222,6 +239,25 @@ export default function AdminInventoryVehicleForm() {
         ? p.key_features.filter((f) => f !== key)
         : [...p.key_features, key],
     }))
+  }
+
+  const MAX_REASONS = 6
+
+  const addReason = () => {
+    setForm((p) => (
+      p.reasons_to_buy.length >= MAX_REASONS
+        ? p
+        : { ...p, reasons_to_buy: [...p.reasons_to_buy, { title: '', description: '' }] }
+    ))
+  }
+  const updateReason = (index, field, value) => {
+    setForm((p) => ({
+      ...p,
+      reasons_to_buy: p.reasons_to_buy.map((r, i) => (i === index ? { ...r, [field]: value } : r)),
+    }))
+  }
+  const removeReason = (index) => {
+    setForm((p) => ({ ...p, reasons_to_buy: p.reasons_to_buy.filter((_, i) => i !== index) }))
   }
 
   const addFiles = (fileList) => {
@@ -269,6 +305,11 @@ export default function AdminInventoryVehicleForm() {
       setSaving(false)
       return
     }
+    if (form.original_price !== '' && Number(form.original_price) <= Number(form.listing_price || 0)) {
+      setFormError('Original price must be greater than the listing price for a discount to apply.')
+      setSaving(false)
+      return
+    }
 
     const payload = {
       vehicle_type: form.vehicle_type,
@@ -281,6 +322,11 @@ export default function AdminInventoryVehicleForm() {
       mileage_km: form.mileage_km === '' ? 0 : Number(form.mileage_km),
       key_features: form.key_features,
       listing_price: form.listing_price === '' ? 0 : Number(form.listing_price),
+      original_price: form.original_price === '' ? null : Number(form.original_price),
+      offer_valid_until: form.offer_valid_until || null,
+      reasons_to_buy: form.reasons_to_buy
+        .map((r) => ({ title: (r.title || '').trim(), description: (r.description || '').trim() }))
+        .filter((r) => r.title),
       insurance_policy_no: form.insurance_policy_no.trim(),
       registration_no: form.registration_no.trim(),
       tax_expiration_date: form.tax_expiration_date || null,
@@ -486,28 +532,17 @@ export default function AdminInventoryVehicleForm() {
                 </p>
               ) : (
                 <>
-                  {safetyFeatures.length > 0 ? (
-                    <div>
-                      <p className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500">Safety</p>
+                  {featureGroups.map((group) => (
+                    <div key={group.value}>
+                      <p className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500">{group.label}</p>
                       <FeatureCheckboxGrid
-                        features={safetyFeatures}
+                        features={group.features}
                         selectedIds={form.key_features}
                         onToggle={toggleFeature}
                         theme={theme}
                       />
                     </div>
-                  ) : null}
-                  {generalFeatures.length > 0 ? (
-                    <div>
-                      <p className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500">Features</p>
-                      <FeatureCheckboxGrid
-                        features={generalFeatures}
-                        selectedIds={form.key_features}
-                        onToggle={toggleFeature}
-                        theme={theme}
-                      />
-                    </div>
-                  ) : null}
+                  ))}
                 </>
               )}
             </div>
@@ -528,6 +563,32 @@ export default function AdminInventoryVehicleForm() {
                     className="w-full bg-white px-3 py-2.5 text-sm text-slate-800 outline-none placeholder:text-slate-400 dark:bg-transparent dark:text-slate-100"
                   />
                 </div>
+              </div>
+              <div>
+                <label className={labelCls}>Original Price (MRP) — optional</label>
+                <div className="flex overflow-hidden rounded-xl border border-slate-200 bg-white focus-within:border-slate-300 dark:border-slate-800 dark:bg-slate-950/50">
+                  <span className="flex items-center border-r border-slate-200 px-3 text-sm font-semibold text-slate-600 dark:border-slate-800 dark:text-slate-400">₹</span>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={form.original_price}
+                    onChange={(e) => setForm((p) => ({ ...p, original_price: e.target.value }))}
+                    placeholder="Leave blank for no discount"
+                    className="w-full bg-white px-3 py-2.5 text-sm text-slate-800 outline-none placeholder:text-slate-400 dark:bg-transparent dark:text-slate-100"
+                  />
+                </div>
+                <p className="mt-1 text-xs text-slate-500 dark:text-slate-500">
+                  When set with an offer end date, the public listing shows this struck through with a discount badge.
+                </p>
+              </div>
+              <div>
+                <label className={labelCls}>Offer Valid Until — optional</label>
+                <input
+                  type="date"
+                  value={form.offer_valid_until || ''}
+                  onChange={(e) => setForm((p) => ({ ...p, offer_valid_until: e.target.value }))}
+                  className={inputCls}
+                />
               </div>
               <div>
                 <label className={labelCls}>Insurance Policy No.</label>
@@ -559,7 +620,52 @@ export default function AdminInventoryVehicleForm() {
             </div>
           </SectionCard>
 
-          <SectionCard step={4} title="Vehicle Media">
+          <SectionCard step={4} title="Reasons to Buy">
+            <p className="mb-3 text-sm text-slate-500 dark:text-slate-400">
+              Short marketing highlights shown on this listing's detail page (e.g. "3 new tyres" — "New tyres for a reduced ownership cost"). Optional, up to {MAX_REASONS}.
+            </p>
+            <div className="space-y-3">
+              {form.reasons_to_buy.map((reason, i) => (
+                <div key={i} className="flex items-start gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/50">
+                  <div className="flex-1 space-y-2">
+                    <input
+                      value={reason.title}
+                      onChange={(e) => updateReason(i, 'title', e.target.value)}
+                      placeholder="Title, e.g. 3 new tyres"
+                      maxLength={100}
+                      className={inputCls}
+                    />
+                    <input
+                      value={reason.description}
+                      onChange={(e) => updateReason(i, 'description', e.target.value)}
+                      placeholder="Description, e.g. New tyres for a reduced ownership cost"
+                      maxLength={200}
+                      className={inputCls}
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => removeReason(i)}
+                    className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-rose-600 dark:text-slate-500 dark:hover:bg-slate-800"
+                    aria-label="Remove reason"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+              ))}
+            </div>
+            {form.reasons_to_buy.length < MAX_REASONS ? (
+              <button
+                type="button"
+                onClick={addReason}
+                className="mt-3 inline-flex items-center gap-1.5 rounded-xl border border-dashed border-slate-300 px-3 py-2 text-sm font-semibold text-slate-500 transition hover:border-slate-400 hover:text-slate-700 dark:border-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+              >
+                <Plus size={15} /> Add reason
+              </button>
+            ) : null}
+          </SectionCard>
+
+          <SectionCard step={5} title="Vehicle Media">
             <div
               onDragOver={(e) => { e.preventDefault(); setDragActive(true) }}
               onDragLeave={() => setDragActive(false)}

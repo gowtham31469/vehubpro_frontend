@@ -17,6 +17,22 @@ export async function fetchPublicInventoryVehicles(subdomain, { limit } = {}) {
   return payload?.data ?? []
 }
 
+/** Single-vehicle detail for the "View Details" page — 404s if sold/booked/archived. */
+export async function fetchPublicInventoryVehicleDetail(subdomain, id) {
+  if (!API_BASE_URL) throw new Error('Missing VITE_API_BASE_URL')
+  if (!subdomain) throw new Error('No tenant subdomain detected.')
+
+  const response = await fetch(`${API_BASE_URL}/api/v1/public/portfolio/tenants/${subdomain}/inventory/${id}/`)
+  let payload = null
+  try { payload = await response.json() } catch { payload = null }
+  if (!response.ok) {
+    const err = new Error(payload?.error || payload?.message || 'Could not load this vehicle.')
+    err.status = response.status
+    throw err
+  }
+  return payload?.data ?? null
+}
+
 /** Every active brand the tenant has created — not just ones with current inventory. */
 export async function fetchPublicVehicleBrands(subdomain) {
   if (!API_BASE_URL) throw new Error('Missing VITE_API_BASE_URL')

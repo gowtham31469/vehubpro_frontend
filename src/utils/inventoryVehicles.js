@@ -39,6 +39,13 @@ function toFormData(payload) {
       value.forEach((f) => formData.append('key_features', f))
       return
     }
+    if (key === 'reasons_to_buy') {
+      // A JSONField can't come through multipart form-data as repeated keys
+      // the way a list of IDs can — send it as one JSON-encoded string field;
+      // DRF's JSONField parses a string value automatically.
+      formData.append('reasons_to_buy', JSON.stringify(value || []))
+      return
+    }
     formData.append(key, value)
   })
   return formData

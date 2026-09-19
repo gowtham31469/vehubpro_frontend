@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { Car, Check, ChevronDown, Cog, Fuel, Gauge, Search, SlidersHorizontal, X } from 'lucide-react'
 import { useTenantBranding } from '../context/TenantBrandingContext.jsx'
-import { useToast } from '../context/ToastContext.jsx'
 import { fetchPublicInventoryVehicles } from '../utils/publicPortfolio'
 
 // Matches the "vehicle_types" master rows seeded for portfolio use (see
@@ -227,7 +226,6 @@ function ColorSwatchGroup({ options, selected, onToggle, accentColor }) {
 
 export default function PublicInventoryListing() {
   const { theme, brandingLogoUrl, tenantName, subdomain, tenantError, tenantErrorCode } = useTenantBranding()
-  const { showToast } = useToast()
 
   const [searchParams] = useSearchParams()
 
@@ -384,10 +382,6 @@ export default function PublicInventoryListing() {
     (filters.minPrice !== '' || filters.maxPrice !== '' ? 1 : 0) +
     (filters.minYear ? 1 : 0) +
     (filters.maxKm ? 1 : 0)
-
-  const handleContactClick = () => {
-    showToast('info', `Contact ${tenantName || 'the dealership'} directly to enquire about this vehicle.`)
-  }
 
   if (tenantError) {
     const isPortfolioDisabled = tenantErrorCode === 'PORTFOLIO_MODULE_NOT_ENABLED'
@@ -683,14 +677,13 @@ export default function PublicInventoryListing() {
                             {v.fuel_type_name}
                           </div>
                         </div>
-                        <button
-                          type="button"
-                          onClick={handleContactClick}
-                          className="mt-4 w-full rounded-xl py-2 text-sm font-bold text-white transition hover:opacity-90"
+                        <Link
+                          to={`/portfolio/inventory/${v.id}`}
+                          className="mt-4 flex w-full items-center justify-center rounded-xl py-2 text-sm font-bold text-white transition hover:opacity-90"
                           style={{ backgroundColor: theme.accent }}
                         >
                           View Details
-                        </button>
+                        </Link>
                       </div>
                     </div>
                   ))}
