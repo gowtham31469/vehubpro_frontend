@@ -12,6 +12,16 @@ import muvIcon from '../assets/images/body-types/muv.png'
 import luxurySedanIcon from '../assets/images/body-types/luxury-sedan.png'
 import luxurySuvIcon from '../assets/images/body-types/luxury-suv.png'
 
+// Fixed portfolio theme — deliberately NOT the tenant's dynamic brand color
+// (theme.accent/accentSoft from useTenantBranding). This page uses a fixed
+// light theme + purple/teal palette regardless of tenant branding.
+const ACCENT = '#4B116B'
+const ACCENT_SOFT = '#F0E4F5'
+const TEAL = '#0F766E'
+const TEAL_SOFT = '#CCFBF1'
+const BTN_SHADOW = '0 10px 25px -8px rgba(75, 17, 107, 0.5)'
+const HERO_IMG_SHADOW = '0 20px 45px -15px rgba(15, 23, 42, 0.25)'
+
 const TRUST_POINTS = [
   { icon: ShieldCheck, label: 'Verified Listings' },
   { icon: Sparkles, label: 'Real-Time Inventory' },
@@ -26,7 +36,7 @@ function fmtMoney(n) {
 function isNewListing(createdAt) {
   if (!createdAt) return false
   const days = (Date.now() - new Date(createdAt).getTime()) / (1000 * 60 * 60 * 24)
-  return days <= 30
+  return days <= 10
 }
 
 // Matches the "vehicle_types" master rows seeded for portfolio use (see
@@ -44,32 +54,32 @@ const BODY_TYPE_ICON_SRC = {
   'Luxury SUV': luxurySuvIcon,
 }
 
-// Icons are black-outline PNGs; this page is dark end-to-end, so they're always
-// flipped to white via CSS filter (raster images can't use currentColor).
-function BodyTypeIcon({ type, size = 26, className = '' }) {
+// Icons are black-outline PNGs; on this light theme they render as plain
+// black (brightness-0) by default, and flip to white (invert) only when
+// shown on the solid purple "active" background — raster images can't use
+// currentColor, so a CSS filter swap is the only way to recolor them.
+function BodyTypeIcon({ type, size = 26, active = false }) {
   const src = BODY_TYPE_ICON_SRC[type]
-  if (!src) return <Car size={size} className={className} />
+  if (!src) return <Car size={size} className={active ? 'text-white' : 'text-slate-600'} />
   return (
     <img
       src={src}
       alt=""
       width={size}
       height={size}
-      className={`object-contain brightness-0 invert ${className}`}
+      className={`object-contain ${active ? 'brightness-0 invert' : 'brightness-0'}`}
     />
   )
 }
 
 export default function PublicPortfolio() {
-  const { theme, branding, brandingLogoUrl, tenantName, subdomain, tenantError, tenantErrorCode } = useTenantBranding()
+  const { branding, brandingLogoUrl, tenantName, subdomain, tenantError } = useTenantBranding()
   const { showToast } = useToast()
 
   const [vehicles, setVehicles] = useState([])
   const [allBrands, setAllBrands] = useState([])
 
-  const [featuredTab, setFeaturedTab] = useState('best')
   const [selectedBodyType, setSelectedBodyType] = useState('')
-  const [bodyTypeShowAll, setBodyTypeShowAll] = useState(false)
   const featuredScrollRef = useRef(null)
 
   useEffect(() => {
@@ -85,21 +95,24 @@ export default function PublicPortfolio() {
   }, [subdomain])
 
   const featuredVehicles = useMemo(() => {
-    const rows = [...vehicles]
-    if (featuredTab === 'new') {
-      rows.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
-    } else {
-      rows.sort((a, b) => Number(a.listing_price || 0) - Number(b.listing_price || 0))
-    }
-    return rows.slice(0, 8)
-  }, [vehicles, featuredTab])
+    // Only vehicles the tenant has explicitly flagged as "Featured" (via
+    // AdminInventoryVehicleForm.jsx) show here — not just the cheapest/newest
+    // of the whole inventory.
+    return vehicles
+      .filter((v) => v.is_featured)
+      .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+      .slice(0, 8)
+  }, [vehicles])
 
   const effectiveBodyType = selectedBodyType || BODY_TYPES[0]
   const bodyTypeVehicles = useMemo(
-    () => vehicles.filter((v) => v.vehicle_type_name === effectiveBodyType),
+    () =>
+      vehicles
+        .filter((v) => v.vehicle_type_name === effectiveBodyType)
+        .sort((a, b) => new Date(b.created_at) - new Date(a.created_at)),
     [vehicles, effectiveBodyType]
   )
-  const visibleBodyTypeVehicles = bodyTypeShowAll ? bodyTypeVehicles : bodyTypeVehicles.slice(0, 4)
+  const visibleBodyTypeVehicles = bodyTypeVehicles.slice(0, 4)
 
   const brandCounts = useMemo(() => {
     const countByName = new Map()
@@ -143,7 +156,6 @@ export default function PublicPortfolio() {
 
   const handleSelectBodyType = (type) => {
     setSelectedBodyType(type)
-    setBodyTypeShowAll(false)
   }
 
   const scrollFeatured = (dir) => {
@@ -151,85 +163,95 @@ export default function PublicPortfolio() {
   }
 
   if (tenantError) {
-    const isPortfolioDisabled = tenantErrorCode === 'PORTFOLIO_MODULE_NOT_ENABLED'
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#0B0B0B] px-4 text-center text-white">
+      <div className="flex min-h-screen items-center justify-center bg-white px-4 text-center text-slate-900">
         <div>
-          <h1 className="text-xl font-bold">{isPortfolioDisabled ? 'Portfolio Not Available' : 'Dealership not found'}</h1>
-          <p className="mt-2 text-sm text-[#9CA3AF]">
-            {isPortfolioDisabled
-              ? 'This dealership does not have the Portfolio module enabled.'
-              : 'Please check the URL and try again.'}
-          </p>
+          <h1 className="text-xl font-bold">Dealership not found</h1>
+          <p className="mt-2 text-sm text-slate-500">Please check the URL and try again.</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (branding?.has_portfolio_access === false) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-white px-4 text-center text-slate-900">
+        <div>
+          <h1 className="text-xl font-bold">Portfolio Not Available</h1>
+          <p className="mt-2 text-sm text-slate-500">This dealership does not have the Portfolio module enabled.</p>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-[#0B0B0B] text-white">
+    <div className="min-h-screen bg-[#F6F5FA] text-slate-900">
       {/* Nav */}
-      <header className="sticky top-0 z-30 border-b border-[#262626] bg-[#0B0B0B]/90 backdrop-blur-sm">
+      <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 shadow-sm backdrop-blur-sm">
         <div className="mx-auto flex max-w-[1240px] items-center justify-between px-6 py-4">
           <div className="flex items-center gap-2.5">
             {brandingLogoUrl ? (
               <img src={brandingLogoUrl} alt={tenantName} className="h-9 w-9 rounded-lg object-contain" />
             ) : (
-              <div className="flex h-9 w-9 items-center justify-center rounded-lg" style={{ backgroundColor: theme.accentSoft }}>
-                <Car size={18} style={{ color: theme.accent }} />
+              <div className="flex h-9 w-9 items-center justify-center rounded-lg" style={{ backgroundColor: ACCENT_SOFT }}>
+                <Car size={18} style={{ color: ACCENT }} />
               </div>
             )}
-            <span className="text-lg font-extrabold uppercase tracking-tight text-white">{tenantName || 'Showroom'}</span>
+            <span className="text-lg font-extrabold uppercase tracking-tight text-slate-900">{tenantName || 'Showroom'}</span>
           </div>
-          <nav className="hidden items-center gap-8 text-sm font-semibold text-[#9CA3AF] md:flex">
-            <button type="button" onClick={() => scrollToId('top')} className="transition hover:text-white">Home</button>
-            <Link to="/portfolio/inventory" className="transition hover:text-white">Inventory</Link>
-            <Link to="/portfolio/contact" className="transition hover:text-white">Contact</Link>
+          <nav className="hidden items-center gap-8 text-sm font-semibold text-slate-500 md:flex">
+            <button type="button" onClick={() => scrollToId('top')} className="text-slate-900">Home</button>
+            <Link to="/portfolio/inventory" className="transition hover:text-slate-900">Inventory</Link>
+            <Link to="/portfolio/contact" className="transition hover:text-slate-900">Contact</Link>
           </nav>
         </div>
       </header>
 
       {/* Hero */}
-      <section id="top" className="bg-[#0B0B0B] pb-16 md:pb-20">
+      <section id="top" className="pb-16 md:pb-20">
         <div className="mx-auto grid max-w-[1240px] grid-cols-1 items-center gap-10 px-6 pb-10 pt-14 md:grid-cols-2 md:pt-20">
           <div>
             <span
               className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold uppercase tracking-wide"
-              style={{ backgroundColor: theme.accentSoft, color: theme.accent }}
+              style={{ backgroundColor: ACCENT_SOFT, color: ACCENT }}
             >
               <Sparkles size={13} /> Featured Arrival
             </span>
-            <h1 className="mt-5 text-4xl font-extrabold uppercase leading-[0.98] tracking-tight text-white md:text-6xl">
-              Find The Perfect<br />Car For <span style={{ color: theme.accent }}>You</span>
+            <h1 className="mt-5 text-4xl font-extrabold uppercase leading-[0.98] tracking-tight text-slate-900 md:text-6xl">
+              Find The Perfect<br />Car For <span style={{ color: ACCENT }}>You</span>
             </h1>
-            <p className="mt-5 max-w-md text-[#9CA3AF]">
+            <p className="mt-5 max-w-md text-slate-500">
               Explore {tenantName || 'our'} curated selection of quality vehicles, each ready for its next owner.
             </p>
             <div className="mt-7 flex flex-wrap gap-3">
               <Link
                 to="/portfolio/inventory"
-                className="rounded-xl px-6 py-3 text-sm font-bold text-white shadow transition-opacity hover:opacity-90"
-                style={{ backgroundColor: theme.accent }}
+                className="rounded-full px-6 py-3 text-sm font-bold text-white transition hover:opacity-90"
+                style={{ backgroundColor: ACCENT, boxShadow: BTN_SHADOW }}
               >
                 View Inventory
               </Link>
               <Link
                 to="/portfolio/contact"
-                className="rounded-xl border border-[#3A3A3A] bg-transparent px-6 py-3 text-sm font-bold text-white transition hover:bg-[#141414]"
+                className="rounded-full px-6 py-3 text-sm font-bold shadow-sm transition hover:opacity-90"
+                style={{ backgroundColor: TEAL_SOFT, color: TEAL }}
               >
                 Sell Your Car
               </Link>
             </div>
             <div className="mt-10 grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-4">
               {TRUST_POINTS.map(({ icon: Icon, label }) => (
-                <div key={label} className="flex items-center gap-2 text-xs font-semibold text-[#9CA3AF]">
-                  <Icon size={16} style={{ color: theme.accent }} />
+                <div key={label} className="flex items-center gap-2 text-xs font-semibold text-slate-500">
+                  <Icon size={16} style={{ color: ACCENT }} />
                   {label}
                 </div>
               ))}
             </div>
           </div>
-          <div className="h-72 overflow-hidden rounded-[20px] border border-[#262626] md:h-[26rem]">
+          <div
+            className="h-72 overflow-hidden rounded-[20px] border border-slate-200 md:h-[26rem]"
+            style={{ boxShadow: HERO_IMG_SHADOW }}
+          >
             <img
               src={heroFallbackImage}
               alt="Featured vehicle"
@@ -241,33 +263,11 @@ export default function PublicPortfolio() {
 
       {/* Featured cars */}
       {featuredVehicles.length > 0 ? (
-        <section className="border-t border-[#1A1A1A] px-6 py-16">
+        <section className="border-t border-slate-200/70 px-6 py-16">
           <div className="mx-auto max-w-[1240px]">
-            <h2 className="text-center text-2xl font-extrabold uppercase tracking-tight text-white md:text-3xl">
+            <h2 className="text-center text-2xl font-extrabold uppercase tracking-tight text-slate-900 md:text-3xl">
               Featured {tenantName || 'Showroom'} Cars
             </h2>
-            <div className="mt-6 flex justify-center">
-              <div className="inline-flex gap-1 rounded-full border border-[#262626] bg-[#141414] p-1">
-                {[
-                  { id: 'best', label: 'Best buys for you' },
-                  { id: 'new', label: 'Newly added' },
-                ].map((tab) => (
-                  <button
-                    key={tab.id}
-                    type="button"
-                    onClick={() => setFeaturedTab(tab.id)}
-                    className="rounded-full px-5 py-2.5 text-sm font-bold transition"
-                    style={
-                      featuredTab === tab.id
-                        ? { backgroundColor: theme.accent, color: '#fff' }
-                        : { color: '#9CA3AF' }
-                    }
-                  >
-                    {tab.label}
-                  </button>
-                ))}
-              </div>
-            </div>
 
             <div className="relative mt-8">
               <div
@@ -275,42 +275,42 @@ export default function PublicPortfolio() {
                 className="flex gap-5 overflow-x-auto pb-2 scroll-smooth [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
               >
                 {featuredVehicles.map((v) => (
-                  <div key={v.id} className="w-72 shrink-0 overflow-hidden rounded-2xl border border-[#262626] bg-[#141414]">
-                    <div className="relative h-40 bg-[#0B0B0B]">
-                      {v.photo_urls?.[0] ? (
-                        <img src={v.photo_urls[0]} alt={`${v.brand_name} ${v.vehicle_model_name}`} className="h-full w-full object-cover" />
+                  <div key={v.id} className="w-72 shrink-0 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm shadow-slate-200/70 transition-shadow hover:shadow-md">
+                    <div className="relative h-40 bg-slate-100">
+                      {v.cover_thumbnail_url || v.photo_urls?.[0] ? (
+                        <img src={v.cover_thumbnail_url || v.photo_urls[0]} alt={`${v.brand_name} ${v.vehicle_model_name}`} className="h-full w-full object-cover" />
                       ) : (
                         <div className="flex h-full items-center justify-center">
-                          <Car size={36} className="text-[#3A3A3A]" />
+                          <Car size={36} className="text-slate-300" />
                         </div>
                       )}
                       {isNewListing(v.created_at) ? (
-                        <span className="absolute left-2 top-2 rounded-full bg-white px-2 py-0.5 text-[11px] font-bold text-[#141414] shadow">
+                        <span className="absolute left-2 top-2 rounded-full px-2 py-0.5 text-[11px] font-bold text-white shadow" style={{ backgroundColor: ACCENT }}>
                           New
                         </span>
                       ) : null}
                     </div>
                     <div className="p-4">
-                      <p className="font-bold text-white">{v.year} {v.brand_name} {v.vehicle_model_name}</p>
-                      <p className="mt-0.5 text-lg font-extrabold" style={{ color: theme.accent }}>{fmtMoney(v.listing_price)}</p>
-                      <div className="mt-3 grid grid-cols-3 gap-1.5 text-center text-[11px] text-[#9CA3AF]">
-                        <div className="flex flex-col items-center gap-1 rounded-lg bg-[#1A1A1A] py-2">
+                      <p className="font-bold text-slate-900">{v.year} {v.brand_name} {v.vehicle_model_name}</p>
+                      <p className="mt-0.5 text-lg font-extrabold" style={{ color: ACCENT }}>{fmtMoney(v.listing_price)}</p>
+                      <div className="mt-3 grid grid-cols-3 gap-1.5 text-center text-[11px] text-slate-500">
+                        <div className="flex flex-col items-center gap-1 rounded-lg bg-slate-50 py-2">
                           <Gauge size={14} />
                           {Number(v.mileage_km || 0).toLocaleString('en-IN')} km
                         </div>
-                        <div className="flex flex-col items-center gap-1 rounded-lg bg-[#1A1A1A] py-2 capitalize">
+                        <div className="flex flex-col items-center gap-1 rounded-lg bg-slate-50 py-2 capitalize">
                           <Cog size={14} />
                           {v.transmission}
                         </div>
-                        <div className="flex flex-col items-center gap-1 rounded-lg bg-[#1A1A1A] py-2">
+                        <div className="flex flex-col items-center gap-1 rounded-lg bg-slate-50 py-2">
                           <Fuel size={14} />
                           {v.fuel_type_name}
                         </div>
                       </div>
                       <Link
                         to={`/portfolio/inventory/${v.id}`}
-                        className="mt-4 flex w-full items-center justify-center rounded-xl py-2 text-sm font-bold text-white transition hover:opacity-90"
-                        style={{ backgroundColor: theme.accent }}
+                        className="mt-4 flex w-full items-center justify-center rounded-full py-2 text-sm font-bold text-white transition hover:opacity-90"
+                        style={{ backgroundColor: ACCENT }}
                       >
                         View Details
                       </Link>
@@ -323,7 +323,7 @@ export default function PublicPortfolio() {
                   <button
                     type="button"
                     onClick={() => scrollFeatured(-1)}
-                    className="absolute -left-4 top-1/3 flex h-10 w-10 items-center justify-center rounded-full border border-[#262626] bg-[#141414] text-[#9CA3AF] shadow-lg transition hover:text-white"
+                    className="absolute -left-4 top-1/3 flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-lg transition hover:text-slate-900"
                     aria-label="Scroll left"
                   >
                     <ChevronLeft size={18} />
@@ -331,7 +331,7 @@ export default function PublicPortfolio() {
                   <button
                     type="button"
                     onClick={() => scrollFeatured(1)}
-                    className="absolute -right-4 top-1/3 flex h-10 w-10 items-center justify-center rounded-full border border-[#262626] bg-[#141414] text-[#9CA3AF] shadow-lg transition hover:text-white"
+                    className="absolute -right-4 top-1/3 flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-lg transition hover:text-slate-900"
                     aria-label="Scroll right"
                   >
                     <ChevronRight size={18} />
@@ -343,7 +343,7 @@ export default function PublicPortfolio() {
             <div className="mt-8 flex justify-center">
               <Link
                 to="/portfolio/inventory"
-                className="rounded-xl border border-[#3A3A3A] px-6 py-3 text-sm font-bold text-white transition hover:bg-[#141414]"
+                className="rounded-full border border-slate-300 bg-white px-6 py-3 text-sm font-bold text-slate-700 shadow-sm transition hover:bg-slate-50"
               >
                 View all {tenantName || 'showroom'} cars
               </Link>
@@ -353,11 +353,11 @@ export default function PublicPortfolio() {
       ) : null}
 
       {/* Browse by body type */}
-      <section className="border-t border-[#1A1A1A] px-6 py-16">
+      <section className="border-t border-slate-200/70 px-6 py-16">
         <div className="mx-auto max-w-[1240px]">
-          <h2 className="text-center text-2xl font-extrabold uppercase tracking-tight text-white md:text-3xl">Browse By Body Type</h2>
+          <h2 className="text-center text-2xl font-extrabold uppercase tracking-tight text-slate-900 md:text-3xl">Browse By Body Type</h2>
           <div className="mt-8 flex justify-center">
-            <div className="flex flex-wrap justify-center gap-2 rounded-2xl border border-[#262626] bg-[#141414] p-3">
+            <div className="flex flex-wrap justify-center gap-2 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
               {BODY_TYPES.map((type) => (
                 <button
                   key={type}
@@ -366,11 +366,11 @@ export default function PublicPortfolio() {
                   className="flex w-24 flex-col items-center gap-1.5 rounded-xl px-3 py-3 text-xs font-bold uppercase tracking-wide transition"
                   style={
                     effectiveBodyType === type
-                      ? { backgroundColor: theme.accent, color: '#fff' }
-                      : { color: '#9CA3AF' }
+                      ? { backgroundColor: ACCENT, color: '#fff' }
+                      : { color: '#64748B' }
                   }
                 >
-                  <BodyTypeIcon type={type} size={30} />
+                  <BodyTypeIcon type={type} size={30} active={effectiveBodyType === type} />
                   {type}
                 </button>
               ))}
@@ -380,78 +380,79 @@ export default function PublicPortfolio() {
           {visibleBodyTypeVehicles.length > 0 ? (
             <div className="mt-8 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
               {visibleBodyTypeVehicles.map((v) => (
-                <div key={v.id} className="relative aspect-[4/3] overflow-hidden rounded-2xl border border-[#262626] bg-[#141414]">
-                  {v.photo_urls?.[0] ? (
-                    <img src={v.photo_urls[0]} alt={`${v.brand_name} ${v.vehicle_model_name}`} className="h-full w-full object-cover" />
-                  ) : (
-                    <div className="flex h-full items-center justify-center">
-                      <Car size={32} className="text-[#3A3A3A]" />
-                    </div>
-                  )}
-                  <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/90 via-black/10 to-transparent" />
-                  <div className="absolute inset-x-0 bottom-0 p-4">
-                    <p className="text-sm font-bold text-white">{v.brand_name} {v.vehicle_model_name}</p>
-                    <p className="mt-0.5 text-xs text-[#9CA3AF]">
-                      <span className="text-sm font-extrabold text-white">{fmtMoney(v.listing_price)}</span> onwards
+                <div key={v.id} className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm shadow-slate-200/70 transition-shadow hover:shadow-md">
+                  <div className="relative aspect-[4/3] bg-slate-100">
+                    {v.cover_thumbnail_url || v.photo_urls?.[0] ? (
+                      <img src={v.cover_thumbnail_url || v.photo_urls[0]} alt={`${v.brand_name} ${v.vehicle_model_name}`} className="h-full w-full object-cover" />
+                    ) : (
+                      <div className="flex h-full items-center justify-center">
+                        <Car size={32} className="text-slate-300" />
+                      </div>
+                    )}
+                  </div>
+                  <div className="p-4">
+                    <p className="text-sm font-bold text-slate-900">{v.brand_name} {v.vehicle_model_name}</p>
+                    <p className="mt-0.5 text-xs text-slate-500">
+                      <span className="text-sm font-extrabold" style={{ color: ACCENT }}>{fmtMoney(v.listing_price)}</span> onwards
                     </p>
                   </div>
                 </div>
               ))}
             </div>
           ) : (
-            <p className="mt-10 text-center text-sm text-[#6B7280]">
+            <p className="mt-10 text-center text-sm text-slate-400">
               No {effectiveBodyType} listings yet — check back soon.
             </p>
           )}
 
-          {bodyTypeVehicles.length > 4 ? (
+          {bodyTypeVehicles.length > 0 ? (
             <div className="mt-8 flex justify-center">
-              <button
-                type="button"
-                onClick={() => setBodyTypeShowAll((s) => !s)}
-                className="rounded-xl border border-[#3A3A3A] px-6 py-3 text-sm font-bold text-white transition hover:bg-[#141414]"
+              <Link
+                to={`/portfolio/inventory?bodyType=${encodeURIComponent(effectiveBodyType)}`}
+                className="rounded-full border border-slate-300 bg-white px-6 py-3 text-sm font-bold text-slate-700 shadow-sm transition hover:bg-slate-50"
               >
-                {bodyTypeShowAll ? 'Show less' : `View all ${effectiveBodyType}s`}
-              </button>
+                View {effectiveBodyType} Cars
+              </Link>
             </div>
           ) : null}
         </div>
       </section>
 
       {/* Promotional banner row */}
-      <section className="border-t border-[#1A1A1A] px-6 py-16">
+      <section className="border-t border-slate-200/70 px-6 py-16">
         <div className="mx-auto grid max-w-[1240px] grid-cols-1 gap-5 md:grid-cols-3">
-          <div className="rounded-2xl border border-[#262626] bg-[#141414] p-7">
-            <p className="text-xs font-bold uppercase tracking-wide" style={{ color: theme.accent }}>Have a car to sell?</p>
-            <h3 className="mt-2 text-xl font-extrabold text-white">Sell Your Car With Us</h3>
-            <p className="mt-2 text-sm text-[#9CA3AF]">Get a fair valuation and a hassle-free sale, handled directly by {tenantName || 'our team'}.</p>
+          <div className="rounded-2xl border border-slate-200 bg-white p-7 shadow-sm shadow-slate-200/70">
+            <p className="text-xs font-bold uppercase tracking-wide" style={{ color: ACCENT }}>Have a car to sell?</p>
+            <h3 className="mt-2 text-xl font-extrabold text-slate-900">Sell Your Car With Us</h3>
+            <p className="mt-2 text-sm text-slate-500">Get a fair valuation and a hassle-free sale, handled directly by {tenantName || 'our team'}.</p>
             <Link
               to="/portfolio/contact"
-              className="mt-5 inline-block rounded-xl px-5 py-2.5 text-sm font-bold text-white transition-opacity hover:opacity-90"
-              style={{ backgroundColor: theme.accent }}
+              className="mt-5 inline-block rounded-full px-5 py-2.5 text-sm font-bold text-white transition hover:opacity-90"
+              style={{ backgroundColor: ACCENT, boxShadow: BTN_SHADOW }}
             >
               Get Started
             </Link>
           </div>
-          <div className="rounded-2xl border border-[#262626] bg-[#141414] p-7">
-            <p className="text-xs font-bold uppercase tracking-wide text-[#9CA3AF]">Questions about a listing?</p>
-            <h3 className="mt-2 text-xl font-extrabold text-white">Talk to the Team</h3>
-            <p className="mt-2 text-sm text-[#9CA3AF]">Reach out directly — we typically respond the same day.</p>
+          <div className="rounded-2xl border border-slate-200 bg-white p-7 shadow-sm shadow-slate-200/70">
+            <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Questions about a listing?</p>
+            <h3 className="mt-2 text-xl font-extrabold text-slate-900">Talk to the Team</h3>
+            <p className="mt-2 text-sm text-slate-500">Reach out directly — we typically respond the same day.</p>
             <button
               type="button"
               onClick={handleContactClick}
-              className="mt-5 rounded-xl border border-[#3A3A3A] px-5 py-2.5 text-sm font-bold text-white transition hover:bg-[#1A1A1A]"
+              className="mt-5 rounded-full px-5 py-2.5 text-sm font-bold shadow-sm transition hover:opacity-90"
+              style={{ backgroundColor: TEAL_SOFT, color: TEAL }}
             >
               Enquire Now
             </button>
           </div>
-          <div className="rounded-2xl border border-[#262626] bg-[#141414] p-7">
-            <p className="text-xs font-bold uppercase tracking-wide text-[#9CA3AF]">{vehicles.length} vehicles listed</p>
-            <h3 className="mt-2 text-xl font-extrabold text-white">See Everything In Stock</h3>
-            <p className="mt-2 text-sm text-[#9CA3AF]">Browse the full, filterable inventory in one place.</p>
+          <div className="rounded-2xl border border-slate-200 bg-white p-7 shadow-sm shadow-slate-200/70">
+            <p className="text-xs font-bold uppercase tracking-wide text-slate-500">{vehicles.length} vehicles listed</p>
+            <h3 className="mt-2 text-xl font-extrabold text-slate-900">See Everything In Stock</h3>
+            <p className="mt-2 text-sm text-slate-500">Browse the full, filterable inventory in one place.</p>
             <Link
               to="/portfolio/inventory"
-              className="mt-5 inline-block rounded-xl border border-[#3A3A3A] px-5 py-2.5 text-sm font-bold text-white transition hover:bg-[#1A1A1A]"
+              className="mt-5 inline-block rounded-full border border-slate-300 px-5 py-2.5 text-sm font-bold text-slate-700 shadow-sm transition hover:bg-slate-50"
             >
               View Inventory
             </Link>
@@ -461,9 +462,9 @@ export default function PublicPortfolio() {
 
       {/* Explore popular brands */}
       {brandCounts.length > 0 ? (
-        <section id="brands" className="border-t border-[#1A1A1A] px-6 py-16">
+        <section id="brands" className="border-t border-slate-200/70 px-6 py-16">
           <div className="mx-auto max-w-[1240px]">
-            <h2 className="text-center text-2xl font-extrabold uppercase tracking-tight text-white md:text-3xl">Explore Popular Brands</h2>
+            <h2 className="text-center text-2xl font-extrabold uppercase tracking-tight text-slate-900 md:text-3xl">Explore Popular Brands</h2>
 
             {popularBrands.length > 0 ? (
               <div className="mt-10 grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
@@ -473,35 +474,34 @@ export default function PublicPortfolio() {
                   <Link
                     key={b.name}
                     to={`/portfolio/inventory?brand=${encodeURIComponent(b.name)}`}
-                    className="group flex flex-col items-center gap-2.5 rounded-2xl border border-[#1A1A1A] bg-[#111111] px-4 py-6 text-center transition hover:border-[#3A3A3A] hover:bg-[#161616]"
+                    className="group flex flex-col items-center gap-2.5 rounded-2xl border border-slate-200 bg-white px-4 py-6 text-center shadow-sm transition hover:border-slate-300 hover:shadow-md"
                   >
                     {b.logoUrl ? (
-                      <span className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-full bg-white p-2 transition group-hover:scale-105">
+                      <span className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-full bg-white p-2 shadow-sm transition group-hover:scale-105">
                         <img src={b.logoUrl} alt={b.name} className="h-full w-full object-contain" />
                       </span>
                     ) : (
                       <span
-                        className="flex h-12 w-12 items-center justify-center rounded-full text-base font-bold transition group-hover:scale-105"
-                        style={{ backgroundColor: '#1A1A1A', color: '#9CA3AF' }}
+                        className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-base font-bold text-slate-500 transition group-hover:scale-105"
                       >
                         {b.name.slice(0, 1).toUpperCase()}
                       </span>
                     )}
-                    <span className="text-sm font-semibold text-white">{b.name}</span>
-                    <span className="text-xs font-bold" style={{ color: theme.accent }}>
+                    <span className="text-sm font-semibold text-slate-900">{b.name}</span>
+                    <span className="text-xs font-bold" style={{ color: ACCENT }}>
                       {b.count} {b.count === 1 ? 'car' : 'cars'}
                     </span>
                   </Link>
                 ))}
               </div>
             ) : (
-              <p className="mt-6 text-center text-sm text-[#6B7280]">No listings yet — check back soon.</p>
+              <p className="mt-6 text-center text-sm text-slate-400">No listings yet — check back soon.</p>
             )}
 
             <div className="mt-8 flex justify-center">
               <Link
                 to="/portfolio/inventory"
-                className="rounded-xl border border-[#3A3A3A] px-6 py-3 text-sm font-bold text-white transition hover:bg-[#141414]"
+                className="rounded-full border border-slate-300 bg-white px-6 py-3 text-sm font-bold text-slate-700 shadow-sm transition hover:bg-slate-50"
               >
                 View all cars
               </Link>
@@ -514,7 +514,7 @@ export default function PublicPortfolio() {
       <section className="px-6 py-16">
         <div
           className="relative mx-auto max-w-[1240px] overflow-hidden rounded-3xl px-8 py-14 text-center text-white"
-          style={{ backgroundColor: theme.accent }}
+          style={{ backgroundColor: ACCENT, boxShadow: '0 25px 50px -15px rgba(75, 17, 107, 0.45)' }}
         >
           <ShieldCheck size={140} className="pointer-events-none absolute -right-6 -top-6 text-white/10" />
           <h2 className="text-3xl font-extrabold uppercase tracking-tight">Ready to find your next car?</h2>
@@ -524,7 +524,8 @@ export default function PublicPortfolio() {
           <div className="mt-6 flex flex-wrap justify-center gap-3">
             <Link
               to="/portfolio/contact"
-              className="rounded-xl bg-white px-6 py-3 text-sm font-bold text-[#141414] shadow hover:bg-slate-100"
+              className="rounded-full bg-white px-6 py-3 text-sm font-bold shadow transition hover:bg-slate-100"
+              style={{ color: ACCENT }}
             >
               Contact Us
             </Link>
@@ -532,20 +533,8 @@ export default function PublicPortfolio() {
         </div>
       </section>
 
-      {/* Trust bar */}
-      <div className="border-t border-[#1A1A1A] px-6 py-8">
-        <div className="mx-auto grid max-w-[1240px] grid-cols-2 gap-6 sm:grid-cols-4">
-          {TRUST_POINTS.map(({ icon: Icon, label }) => (
-            <div key={label} className="flex items-center justify-center gap-2 text-center text-xs font-semibold text-[#9CA3AF] sm:justify-start">
-              <Icon size={16} style={{ color: theme.accent }} />
-              {label}
-            </div>
-          ))}
-        </div>
-      </div>
-
       {/* Footer */}
-      <footer className="border-t border-[#1A1A1A] py-10">
+      <footer className="border-t border-slate-200 bg-white py-10">
         <div className="mx-auto max-w-[1240px] px-6">
           <div className="flex flex-col items-center justify-between gap-6 text-center sm:flex-row sm:items-start sm:text-left">
             <div>
@@ -553,24 +542,24 @@ export default function PublicPortfolio() {
                 {brandingLogoUrl ? (
                   <img src={brandingLogoUrl} alt={tenantName} className="h-7 w-7 rounded object-contain" />
                 ) : null}
-                <span className="text-lg font-extrabold uppercase tracking-tight text-white">{tenantName || 'Showroom'}</span>
+                <span className="text-lg font-extrabold uppercase tracking-tight text-slate-900">{tenantName || 'Showroom'}</span>
               </div>
-              <p className="mt-2 max-w-xs text-sm text-[#6B7280]">
+              <p className="mt-2 max-w-xs text-sm text-slate-400">
                 {branding?.address || 'Quality vehicles, straightforward buying — browse the full inventory or get in touch.'}
               </p>
               {branding?.phone ? (
-                <a href={`tel:${branding.phone}`} className="mt-1 inline-block text-sm text-[#9CA3AF] hover:text-white">
+                <a href={`tel:${branding.phone}`} className="mt-1 inline-block text-sm text-slate-500 hover:text-slate-900">
                   {branding.phone}
                 </a>
               ) : null}
             </div>
-            <div className="flex flex-wrap justify-center gap-x-8 gap-y-2 text-sm text-[#9CA3AF] sm:justify-end">
-              <button type="button" onClick={() => scrollToId('top')} className="hover:text-white">Home</button>
-              <Link to="/portfolio/inventory" className="hover:text-white">Inventory</Link>
-              <Link to="/portfolio/contact" className="hover:text-white">Contact</Link>
+            <div className="flex flex-wrap justify-center gap-x-8 gap-y-2 text-sm text-slate-500 sm:justify-end">
+              <button type="button" onClick={() => scrollToId('top')} className="hover:text-slate-900">Home</button>
+              <Link to="/portfolio/inventory" className="hover:text-slate-900">Inventory</Link>
+              <Link to="/portfolio/contact" className="hover:text-slate-900">Contact</Link>
             </div>
           </div>
-          <div className="mt-8 border-t border-[#1A1A1A] pt-6 text-center text-xs text-[#6B7280]">
+          <div className="mt-8 border-t border-slate-100 pt-6 text-center text-xs text-slate-400">
             © {new Date().getFullYear()} {tenantName || 'Showroom'}. All rights reserved.
           </div>
         </div>

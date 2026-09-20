@@ -4,6 +4,11 @@ import { Car, Check, ChevronDown, Cog, Fuel, Gauge, Search, SlidersHorizontal, X
 import { useTenantBranding } from '../context/TenantBrandingContext.jsx'
 import { fetchPublicInventoryVehicles } from '../utils/publicPortfolio'
 
+// Fixed portfolio theme — same palette as PublicPortfolio.jsx/PublicVehicleDetail.jsx/
+// PublicContact.jsx, deliberately NOT the tenant's dynamic brand color.
+const ACCENT = '#4B116B'
+const ACCENT_SOFT = '#F0E4F5'
+
 // Matches the "vehicle_types" master rows seeded for portfolio use (see
 // backend/apps/platform/vehicles/migrations/0011_seed_body_type_vehicle_types.py).
 const BODY_TYPE_OPTIONS = ['Hatchback', 'Sedan', 'SUV', 'MUV', 'Luxury Sedan', 'Luxury SUV']
@@ -33,8 +38,8 @@ const YEAR_BUCKETS = Array.from({ length: 8 }, (_, i) => CURRENT_YEAR - i * 2)
 
 const PAGE_SIZE = 12
 
-const inputCls = "w-full rounded-xl border border-[#262626] bg-[#1A1A1A] px-3 py-2.5 text-sm text-white outline-none placeholder:text-[#6B7280] focus:border-[#3A3A3A]"
-const labelCls = "mb-2 block text-[10px] font-bold uppercase tracking-wide text-[#6B7280]"
+const inputCls = "w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:border-slate-300"
+const labelCls = "mb-2 block text-[10px] font-bold uppercase tracking-wide text-slate-400"
 
 function fmtMoney(n) {
   return `₹${Number(n || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`
@@ -43,7 +48,7 @@ function fmtMoney(n) {
 function isNewListing(createdAt) {
   if (!createdAt) return false
   const days = (Date.now() - new Date(createdAt).getTime()) / (1000 * 60 * 60 * 24)
-  return days <= 30
+  return days <= 10
 }
 
 /**
@@ -59,7 +64,7 @@ function CheckBadge({ state, accentColor, size = 20 }) {
       className="flex shrink-0 items-center justify-center rounded-full border-2 transition"
       style={{
         width: size, height: size,
-        borderColor: filled ? accentColor : '#3A3A3A',
+        borderColor: filled ? accentColor : '#CBD5E1',
         backgroundColor: filled ? accentColor : 'transparent',
       }}
     >
@@ -102,12 +107,12 @@ function PriceRangeSlider({ min, max, valueMin, valueMax, onChange, accentColor 
 
   return (
     <div>
-      <div className="flex items-center justify-between text-sm font-extrabold text-white">
+      <div className="flex items-center justify-between text-sm font-extrabold text-slate-900">
         <span>{fmtMoney(valueMin)}</span>
         <span>{fmtMoney(valueMax)}</span>
       </div>
       <div className="relative mt-4 h-4">
-        <div className="absolute top-1/2 h-1.5 w-full -translate-y-1/2 rounded-full bg-[#262626]" />
+        <div className="absolute top-1/2 h-1.5 w-full -translate-y-1/2 rounded-full bg-slate-200" />
         <div
           className="absolute top-1/2 h-1.5 -translate-y-1/2 rounded-full"
           style={{ left: `${minPct}%`, right: `${100 - maxPct}%`, backgroundColor: accentColor }}
@@ -133,7 +138,7 @@ function PriceRangeSlider({ min, max, valueMin, valueMax, onChange, accentColor 
           aria-label="Maximum price"
         />
       </div>
-      <div className="mt-2 flex items-center justify-between text-xs font-semibold text-[#6B7280]">
+      <div className="mt-2 flex items-center justify-between text-xs font-semibold text-slate-400">
         <span>Minimum</span>
         <span>Maximum</span>
       </div>
@@ -156,11 +161,11 @@ function BucketFilterGroup({ value, options, formatLabel, onSelect, accentColor 
           >
             <span
               className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-2 transition"
-              style={{ borderColor: selected ? accentColor : '#3A3A3A' }}
+              style={{ borderColor: selected ? accentColor : '#CBD5E1' }}
             >
               {selected ? <span className="h-2 w-2 rounded-full" style={{ backgroundColor: accentColor }} /> : null}
             </span>
-            <span className="text-sm text-[#9CA3AF]">{formatLabel(opt)}</span>
+            <span className="text-sm text-slate-600">{formatLabel(opt)}</span>
           </button>
         )
       })}
@@ -178,10 +183,10 @@ function CheckboxFilterGroup({ options, selected, onToggle, accentColor, formatL
             type="checkbox"
             checked={selected.includes(opt)}
             onChange={() => onToggle(opt)}
-            className="h-4 w-4 shrink-0 rounded border-[#3A3A3A] bg-transparent"
+            className="h-4 w-4 shrink-0 rounded border-slate-300 bg-transparent"
             style={{ accentColor }}
           />
-          <span className="text-sm capitalize text-[#9CA3AF]">{formatLabel ? formatLabel(opt) : opt}</span>
+          <span className="text-sm capitalize text-slate-600">{formatLabel ? formatLabel(opt) : opt}</span>
         </label>
       ))}
     </div>
@@ -202,7 +207,7 @@ function ColorSwatchGroup({ options, selected, onToggle, accentColor }) {
             className="relative h-10 w-10 rounded-xl border-2 transition"
             style={{
               backgroundColor: c.hex,
-              borderColor: active ? accentColor : c.code === 'white' ? '#3A3A3A' : 'transparent',
+              borderColor: active ? accentColor : c.code === 'white' ? '#CBD5E1' : 'transparent',
               boxShadow: active ? `0 0 0 2px ${accentColor}55` : undefined,
             }}
             aria-label={c.name}
@@ -225,7 +230,7 @@ function ColorSwatchGroup({ options, selected, onToggle, accentColor }) {
 }
 
 export default function PublicInventoryListing() {
-  const { theme, brandingLogoUrl, tenantName, subdomain, tenantError, tenantErrorCode } = useTenantBranding()
+  const { branding, brandingLogoUrl, tenantName, subdomain, tenantError } = useTenantBranding()
 
   const [searchParams] = useSearchParams()
 
@@ -265,6 +270,15 @@ export default function PublicInventoryListing() {
             setFilters((prev) => ({ ...prev, models: Array.from(new Set([...prev.models, ...keys])) }))
             setExpandedBrands((prev) => new Set(prev).add(brandParam))
           }
+        }
+        // A "Browse By Body Type" card on the home page links here as
+        // ?bodyType=<type> to land the buyer pre-filtered to that body type.
+        const bodyTypeParam = searchParams.get('bodyType')
+        if (bodyTypeParam && BODY_TYPE_OPTIONS.includes(bodyTypeParam)) {
+          setFilters((prev) => ({
+            ...prev,
+            bodyTypes: Array.from(new Set([...prev.bodyTypes, bodyTypeParam])),
+          }))
         }
       })
       .catch((err) => { if (!cancelled) setLoadError(err.message || 'Could not load inventory.') })
@@ -384,41 +398,48 @@ export default function PublicInventoryListing() {
     (filters.maxKm ? 1 : 0)
 
   if (tenantError) {
-    const isPortfolioDisabled = tenantErrorCode === 'PORTFOLIO_MODULE_NOT_ENABLED'
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#0B0B0B] px-6 text-center text-[#9CA3AF]">
-        <p>{isPortfolioDisabled ? 'This dealership does not have the Portfolio module enabled.' : 'This dealership page could not be found.'}</p>
+      <div className="flex min-h-screen items-center justify-center bg-white px-6 text-center text-slate-500">
+        <p>This dealership page could not be found.</p>
+      </div>
+    )
+  }
+
+  if (branding?.has_portfolio_access === false) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-white px-6 text-center text-slate-500">
+        <p>This dealership does not have the Portfolio module enabled.</p>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-[#0B0B0B] font-sans">
+    <div className="min-h-screen bg-[#F6F5FA] font-sans">
       {/* Header */}
-      <header className="sticky top-0 z-30 border-b border-[#1A1A1A] bg-[#0B0B0B]/95 backdrop-blur-xl">
+      <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 shadow-sm backdrop-blur-xl">
         <div className="mx-auto flex max-w-[1240px] items-center justify-between px-6 py-4">
           <Link to="/portfolio" className="flex items-center gap-2.5">
             {brandingLogoUrl ? (
               <img src={brandingLogoUrl} alt={tenantName} className="h-9 w-9 rounded-lg object-contain" />
             ) : (
-              <div className="flex h-9 w-9 items-center justify-center rounded-lg" style={{ backgroundColor: theme.accentSoft }}>
-                <Car size={18} style={{ color: theme.accent }} />
+              <div className="flex h-9 w-9 items-center justify-center rounded-lg" style={{ backgroundColor: ACCENT_SOFT }}>
+                <Car size={18} style={{ color: ACCENT }} />
               </div>
             )}
-            <span className="text-lg font-extrabold uppercase tracking-tight text-white">{tenantName || 'Showroom'}</span>
+            <span className="text-lg font-extrabold uppercase tracking-tight text-slate-900">{tenantName || 'Showroom'}</span>
           </Link>
-          <nav className="hidden items-center gap-8 text-sm font-semibold text-[#9CA3AF] md:flex">
-            <Link to="/portfolio" className="transition hover:text-white">Home</Link>
-            <span className="text-white">Inventory</span>
-            <Link to="/portfolio/contact" className="transition hover:text-white">Contact</Link>
+          <nav className="hidden items-center gap-8 text-sm font-semibold text-slate-500 md:flex">
+            <Link to="/portfolio" className="transition hover:text-slate-900">Home</Link>
+            <span className="text-slate-900">Inventory</span>
+            <Link to="/portfolio/contact" className="transition hover:text-slate-900">Contact</Link>
           </nav>
         </div>
       </header>
 
       <div className="mx-auto max-w-[1240px] px-6 py-10">
         <div className="mb-8">
-          <h1 className="text-2xl font-extrabold uppercase tracking-tight text-white md:text-3xl">Full Inventory</h1>
-          <p className="mt-1 text-sm text-[#9CA3AF]">
+          <h1 className="text-2xl font-extrabold uppercase tracking-tight text-slate-900 md:text-3xl">Full Inventory</h1>
+          <p className="mt-1 text-sm text-slate-500">
             {loading ? 'Loading vehicles…' : `${filteredVehicles.length} vehicle${filteredVehicles.length === 1 ? '' : 's'} found`}
           </p>
         </div>
@@ -430,21 +451,21 @@ export default function PublicInventoryListing() {
           <aside
             className={`${filtersOpen ? 'block' : 'hidden'} lg:sticky lg:top-[84px] lg:block lg:max-h-[calc(100vh-104px)] lg:self-start lg:overflow-y-auto`}
           >
-            <div className="rounded-2xl border border-[#262626] bg-[#141414] p-5">
+            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm shadow-slate-200/70">
               <div className="mb-4 flex items-center justify-between">
-                <p className="text-sm font-extrabold uppercase tracking-wide text-white">Filters</p>
+                <p className="text-sm font-extrabold uppercase tracking-wide text-slate-900">Filters</p>
                 {activeFilterCount > 0 ? (
-                  <button type="button" onClick={clearFilters} className="text-xs font-bold hover:underline" style={{ color: theme.accent }}>
+                  <button type="button" onClick={clearFilters} className="text-xs font-bold hover:underline" style={{ color: ACCENT }}>
                     Clear all ({activeFilterCount})
                   </button>
                 ) : null}
               </div>
 
-              <div className="divide-y divide-[#1A1A1A]">
+              <div className="divide-y divide-slate-100">
                 <div className="pb-4">
                   <label className={labelCls}>Search</label>
                   <div className="relative">
-                    <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#6B7280]" />
+                    <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                     <input
                       value={filters.search}
                       onChange={(e) => setFilter('search', e.target.value)}
@@ -461,7 +482,7 @@ export default function PublicInventoryListing() {
                     max={priceBounds.max}
                     valueMin={sliderMin}
                     valueMax={sliderMax}
-                    accentColor={theme.accent}
+                    accentColor={ACCENT}
                     onChange={(lo, hi) => {
                       setVisibleCount(PAGE_SIZE)
                       setFilters((prev) => ({ ...prev, minPrice: String(lo), maxPrice: String(hi) }))
@@ -478,11 +499,11 @@ export default function PublicInventoryListing() {
                       placeholder="Search"
                       className={`${inputCls} pr-9`}
                     />
-                    <Search size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-[#6B7280]" />
+                    <Search size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" />
                   </div>
                   <div className="max-h-80 space-y-1 overflow-y-auto pr-1">
                     {visibleBrandTree.length === 0 ? (
-                      <p className="py-2 text-xs text-[#6B7280]">No brands match your search.</p>
+                      <p className="py-2 text-xs text-slate-400">No brands match your search.</p>
                     ) : (
                       visibleBrandTree.map((b) => {
                         const checkedModelCount = b.models.filter((m) => filters.models.includes(`${b.name}||${m}`)).length
@@ -494,7 +515,7 @@ export default function PublicInventoryListing() {
                         const expanded = expandedBrands.has(b.name) || Boolean(brandSearch.trim()) || brandState !== 'unchecked'
                         const hasModels = b.models.length > 0
                         return (
-                          <div key={b.name} className="rounded-xl border border-transparent px-1 transition hover:border-[#1A1A1A]">
+                          <div key={b.name} className="rounded-xl border border-transparent px-1 transition hover:border-slate-100">
                             <div
                               role={hasModels ? 'button' : undefined}
                               tabIndex={hasModels ? 0 : undefined}
@@ -511,7 +532,7 @@ export default function PublicInventoryListing() {
                               {/* Only this small label toggles selection — clicking
                                   it stops the click from also expanding/collapsing. */}
                               <label className="flex cursor-pointer items-center" onClick={(e) => e.stopPropagation()}>
-                                <CheckBadge state={brandState} accentColor={theme.accent} />
+                                <CheckBadge state={brandState} accentColor={ACCENT} />
                                 <input
                                   type="checkbox"
                                   checked={brandState === 'checked'}
@@ -519,20 +540,20 @@ export default function PublicInventoryListing() {
                                   className="sr-only"
                                 />
                               </label>
-                              <span className="flex-1 truncate text-sm font-semibold text-white">{b.name}</span>
+                              <span className="flex-1 truncate text-sm font-semibold text-slate-900">{b.name}</span>
                               {hasModels ? (
-                                <ChevronDown size={14} className={`shrink-0 text-[#6B7280] transition-transform ${expanded ? 'rotate-180' : ''}`} />
+                                <ChevronDown size={14} className={`shrink-0 text-slate-400 transition-transform ${expanded ? 'rotate-180' : ''}`} />
                               ) : null}
                             </div>
                             {expanded && b.models.length > 0 ? (
-                              <div className="ml-2.5 space-y-0.5 border-l border-[#262626] pb-1 pl-4">
+                              <div className="ml-2.5 space-y-0.5 border-l border-slate-200 pb-1 pl-4">
                                 {b.models.map((m) => {
                                   const key = `${b.name}||${m}`
                                   const modelChecked = filters.models.includes(key)
                                   return (
                                     <div key={key} className="flex items-center gap-3 py-1.5">
                                       <label className="flex cursor-pointer items-center">
-                                        <CheckBadge state={modelChecked ? 'checked' : 'unchecked'} accentColor={theme.accent} size={18} />
+                                        <CheckBadge state={modelChecked ? 'checked' : 'unchecked'} accentColor={ACCENT} size={18} />
                                         <input
                                           type="checkbox"
                                           checked={modelChecked}
@@ -540,7 +561,7 @@ export default function PublicInventoryListing() {
                                           className="sr-only"
                                         />
                                       </label>
-                                      <span className="text-sm text-[#9CA3AF]">{m}</span>
+                                      <span className="text-sm text-slate-600">{m}</span>
                                     </div>
                                   )
                                 })}
@@ -560,7 +581,7 @@ export default function PublicInventoryListing() {
                     options={YEAR_BUCKETS}
                     formatLabel={(y) => `${y} & above`}
                     onSelect={(v) => setFilter('minYear', v)}
-                    accentColor={theme.accent}
+                    accentColor={ACCENT}
                   />
                 </div>
 
@@ -571,20 +592,20 @@ export default function PublicInventoryListing() {
                     options={KM_BUCKETS}
                     formatLabel={(km) => `${Number(km).toLocaleString('en-IN')} kms or less`}
                     onSelect={(v) => setFilter('maxKm', v)}
-                    accentColor={theme.accent}
+                    accentColor={ACCENT}
                   />
                 </div>
 
                 <div className="py-4">
                   <label className={labelCls}>Fuel Type</label>
                   {fuelTypeOptions.length === 0 ? (
-                    <p className="text-xs text-[#6B7280]">No fuel types in current inventory.</p>
+                    <p className="text-xs text-slate-400">No fuel types in current inventory.</p>
                   ) : (
                     <CheckboxFilterGroup
                       options={fuelTypeOptions}
                       selected={filters.fuelTypes}
                       onToggle={(v) => toggleFilterValue('fuelTypes', v)}
-                      accentColor={theme.accent}
+                      accentColor={ACCENT}
                     />
                   )}
                 </div>
@@ -595,7 +616,7 @@ export default function PublicInventoryListing() {
                     options={BODY_TYPE_OPTIONS}
                     selected={filters.bodyTypes}
                     onToggle={(v) => toggleFilterValue('bodyTypes', v)}
-                    accentColor={theme.accent}
+                    accentColor={ACCENT}
                   />
                 </div>
 
@@ -605,7 +626,7 @@ export default function PublicInventoryListing() {
                     options={TRANSMISSION_OPTIONS}
                     selected={filters.transmissions}
                     onToggle={(v) => toggleFilterValue('transmissions', v)}
-                    accentColor={theme.accent}
+                    accentColor={ACCENT}
                   />
                 </div>
 
@@ -617,7 +638,7 @@ export default function PublicInventoryListing() {
                     options={COLOR_OPTIONS}
                     selected={filters.colors}
                     onToggle={(v) => toggleFilterValue('colors', v)}
-                    accentColor={theme.accent}
+                    accentColor={ACCENT}
                   />
                 </div>
               </div>
@@ -629,58 +650,58 @@ export default function PublicInventoryListing() {
             <button
               type="button"
               onClick={() => setFiltersOpen((v) => !v)}
-              className="mb-4 flex w-full items-center justify-center gap-2 rounded-xl border border-[#262626] bg-[#141414] py-2.5 text-sm font-bold text-white lg:hidden"
+              className="mb-4 flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white py-2.5 text-sm font-bold text-slate-900 shadow-sm lg:hidden"
             >
               {filtersOpen ? <X size={16} /> : <SlidersHorizontal size={16} />}
               {filtersOpen ? 'Hide Filters' : `Show Filters${activeFilterCount ? ` (${activeFilterCount})` : ''}`}
             </button>
 
             {loading ? (
-              <p className="py-16 text-center text-[#6B7280]">Loading inventory…</p>
+              <p className="py-16 text-center text-slate-400">Loading inventory…</p>
             ) : loadError ? (
-              <p className="py-16 text-center text-rose-400">{loadError}</p>
+              <p className="py-16 text-center text-rose-600">{loadError}</p>
             ) : filteredVehicles.length === 0 ? (
-              <p className="py-16 text-center text-[#6B7280]">No vehicles match your filters right now.</p>
+              <p className="py-16 text-center text-slate-400">No vehicles match your filters right now.</p>
             ) : (
               <>
                 <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3">
                   {visibleVehicles.map((v) => (
-                    <div key={v.id} className="overflow-hidden rounded-2xl border border-[#262626] bg-[#141414]">
-                      <div className="relative h-40 bg-[#0B0B0B]">
-                        {v.photo_urls?.[0] ? (
-                          <img src={v.photo_urls[0]} alt={`${v.brand_name} ${v.vehicle_model_name}`} className="h-full w-full object-cover" />
+                    <div key={v.id} className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm shadow-slate-200/70 transition-shadow hover:shadow-md">
+                      <div className="relative h-40 bg-slate-100">
+                        {v.cover_thumbnail_url || v.photo_urls?.[0] ? (
+                          <img src={v.cover_thumbnail_url || v.photo_urls[0]} alt={`${v.brand_name} ${v.vehicle_model_name}`} className="h-full w-full object-cover" />
                         ) : (
                           <div className="flex h-full items-center justify-center">
-                            <Car size={36} className="text-[#3A3A3A]" />
+                            <Car size={36} className="text-slate-300" />
                           </div>
                         )}
                         {isNewListing(v.created_at) ? (
-                          <span className="absolute right-2 top-2 rounded-full bg-white px-2 py-0.5 text-[11px] font-bold text-[#141414] shadow">
+                          <span className="absolute right-2 top-2 rounded-full px-2 py-0.5 text-[11px] font-bold text-white shadow" style={{ backgroundColor: ACCENT }}>
                             New
                           </span>
                         ) : null}
                       </div>
                       <div className="p-4">
-                        <p className="font-bold text-white">{v.year} {v.brand_name} {v.vehicle_model_name}</p>
-                        <p className="mt-0.5 text-lg font-extrabold" style={{ color: theme.accent }}>{fmtMoney(v.listing_price)}</p>
-                        <div className="mt-3 grid grid-cols-3 gap-1.5 text-center text-[11px] text-[#9CA3AF]">
-                          <div className="flex flex-col items-center gap-1 rounded-lg bg-[#1A1A1A] py-2">
+                        <p className="font-bold text-slate-900">{v.year} {v.brand_name} {v.vehicle_model_name}</p>
+                        <p className="mt-0.5 text-lg font-extrabold" style={{ color: ACCENT }}>{fmtMoney(v.listing_price)}</p>
+                        <div className="mt-3 grid grid-cols-3 gap-1.5 text-center text-[11px] text-slate-500">
+                          <div className="flex flex-col items-center gap-1 rounded-lg bg-slate-50 py-2">
                             <Gauge size={14} />
                             {Number(v.mileage_km || 0).toLocaleString('en-IN')} km
                           </div>
-                          <div className="flex flex-col items-center gap-1 rounded-lg bg-[#1A1A1A] py-2 capitalize">
+                          <div className="flex flex-col items-center gap-1 rounded-lg bg-slate-50 py-2 capitalize">
                             <Cog size={14} />
                             {v.transmission}
                           </div>
-                          <div className="flex flex-col items-center gap-1 rounded-lg bg-[#1A1A1A] py-2">
+                          <div className="flex flex-col items-center gap-1 rounded-lg bg-slate-50 py-2">
                             <Fuel size={14} />
                             {v.fuel_type_name}
                           </div>
                         </div>
                         <Link
                           to={`/portfolio/inventory/${v.id}`}
-                          className="mt-4 flex w-full items-center justify-center rounded-xl py-2 text-sm font-bold text-white transition hover:opacity-90"
-                          style={{ backgroundColor: theme.accent }}
+                          className="mt-4 flex w-full items-center justify-center rounded-full py-2 text-sm font-bold text-white transition hover:opacity-90"
+                          style={{ backgroundColor: ACCENT }}
                         >
                           View Details
                         </Link>
@@ -694,7 +715,7 @@ export default function PublicInventoryListing() {
                     <button
                       type="button"
                       onClick={() => setVisibleCount((c) => c + PAGE_SIZE)}
-                      className="rounded-xl border border-[#3A3A3A] px-6 py-3 text-sm font-bold text-white transition hover:bg-[#141414]"
+                      className="rounded-full border border-slate-300 bg-white px-6 py-3 text-sm font-bold text-slate-700 shadow-sm transition hover:bg-slate-50"
                     >
                       Load More ({filteredVehicles.length - visibleCount} remaining)
                     </button>
@@ -706,8 +727,8 @@ export default function PublicInventoryListing() {
         </div>
       </div>
 
-      <footer className="border-t border-[#1A1A1A] py-8">
-        <div className="mx-auto max-w-[1240px] px-6 text-center text-xs text-[#6B7280]">
+      <footer className="border-t border-slate-200 bg-white py-8">
+        <div className="mx-auto max-w-[1240px] px-6 text-center text-xs text-slate-400">
           © {new Date().getFullYear()} {tenantName || 'Showroom'}. All rights reserved.
         </div>
       </footer>

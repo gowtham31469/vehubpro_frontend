@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Check, Plus, UploadCloud, X } from 'lucide-react'
+import { Check, Plus, Star, UploadCloud, X } from 'lucide-react'
 import AdminShell from '../components/AdminShell'
 import SearchableSelect from '../components/SearchableSelect'
 import { useToast } from '../context/ToastContext.jsx'
@@ -56,6 +56,7 @@ function emptyForm(y0) {
     listing_price: '',
     original_price: '',
     offer_valid_until: '',
+    is_featured: false,
     reasons_to_buy: [],
     insurance_policy_no: '',
     registration_no: '',
@@ -77,6 +78,7 @@ function vehicleToForm(v, y0) {
     listing_price: v.listing_price ?? '',
     original_price: v.original_price ?? '',
     offer_valid_until: v.offer_valid_until || '',
+    is_featured: Boolean(v.is_featured),
     reasons_to_buy: Array.isArray(v.reasons_to_buy) ? v.reasons_to_buy : [],
     insurance_policy_no: v.insurance_policy_no || '',
     registration_no: v.registration_no || '',
@@ -280,34 +282,43 @@ export default function AdminInventoryVehicleForm() {
     addFiles(e.dataTransfer.files)
   }
 
+  // AdminShell renders page content inside a scrollable <main>, not the
+  // window itself — window.scrollTo has no effect here.
+  const scrollToTop = () => {
+    document.querySelector('main')?.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  const failWith = (message) => {
+    setFormError(message)
+    setSaving(false)
+    // The form is long — an error near the top can go unseen if the user is
+    // scrolled down near the submit buttons, so bring it into view.
+    scrollToTop()
+  }
+
   const handleSave = async (e) => {
     e.preventDefault()
     setSaving(true)
     setFormError('')
 
     if (!form.vehicle_type) {
-      setFormError('Body type is required.')
-      setSaving(false)
+      failWith('Body type is required.')
       return
     }
     if (!form.brand) {
-      setFormError('Brand is required.')
-      setSaving(false)
+      failWith('Brand is required.')
       return
     }
     if (!form.vehicle_model) {
-      setFormError('Model is required.')
-      setSaving(false)
+      failWith('Model is required.')
       return
     }
     if (!form.fuel_type) {
-      setFormError('Fuel type is required.')
-      setSaving(false)
+      failWith('Fuel type is required.')
       return
     }
     if (form.original_price !== '' && Number(form.original_price) <= Number(form.listing_price || 0)) {
-      setFormError('Original price must be greater than the listing price for a discount to apply.')
-      setSaving(false)
+      failWith('Original price must be greater than the listing price for a discount to apply.')
       return
     }
 
@@ -324,6 +335,7 @@ export default function AdminInventoryVehicleForm() {
       listing_price: form.listing_price === '' ? 0 : Number(form.listing_price),
       original_price: form.original_price === '' ? null : Number(form.original_price),
       offer_valid_until: form.offer_valid_until || null,
+      is_featured: form.is_featured,
       reasons_to_buy: form.reasons_to_buy
         .map((r) => ({ title: (r.title || '').trim(), description: (r.description || '').trim() }))
         .filter((r) => r.title),
@@ -350,6 +362,7 @@ export default function AdminInventoryVehicleForm() {
       }
       setFormError(err.message)
       showToast('error', err.message || 'Failed to save listing.')
+      scrollToTop()
     } finally {
       setSaving(false)
     }
@@ -469,6 +482,32 @@ export default function AdminInventoryVehicleForm() {
                   )
                 })}
               </div>
+            </div>
+
+            <div className="mt-4">
+              <button
+                type="button"
+                onClick={() => setForm((p) => ({ ...p, is_featured: !p.is_featured }))}
+                className="flex w-full items-center gap-3 rounded-xl border px-4 py-3 text-left transition"
+                style={
+                  form.is_featured
+                    ? { borderColor: theme.accent, backgroundColor: theme.accentSoft }
+                    : undefined
+                }
+              >
+                <Star
+                  size={18}
+                  className="shrink-0"
+                  style={{ color: form.is_featured ? theme.accent : '#94a3b8' }}
+                  fill={form.is_featured ? theme.accent : 'none'}
+                />
+                <span>
+                  <span className="block text-sm font-bold text-slate-900 dark:text-white">Featured on homepage</span>
+                  <span className="block text-xs text-slate-500 dark:text-slate-400">
+                    Only vehicles flagged here appear in the public homepage's "Featured Cars" section.
+                  </span>
+                </span>
+              </button>
             </div>
           </SectionCard>
 

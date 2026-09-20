@@ -146,7 +146,7 @@ export default function AdminInventoryVehicles() {
                     </tr>
                   ) : (
                     rows.map((r) => {
-                      const thumb = r.photo_urls?.[0]?.url
+                      const thumb = r.cover_thumbnail_url || r.photo_urls?.[0]?.url
                       return (
                         <tr key={r.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40">
                           <td className="px-6 py-3">
