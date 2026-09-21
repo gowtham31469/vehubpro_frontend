@@ -5,13 +5,17 @@ import InvoiceSettingsPanel from '../components/InvoiceSettingsPanel.jsx'
 import { useToast } from '../context/ToastContext.jsx'
 import { useTenantBranding } from '../context/TenantBrandingContext.jsx'
 import {
+  createBodyType,
   createBrand,
   createModel,
+  deleteBodyType,
   deleteBrand,
   deleteModel,
+  fetchBodyTypes,
   fetchBrands,
   fetchModels,
   fetchVehicleTypes,
+  updateBodyType,
   updateBrand,
   updateModel,
 } from '../utils/vehicles'
@@ -21,8 +25,17 @@ import {
   fetchInventoryFeatures,
   updateInventoryFeature,
 } from '../utils/inventoryVehicles'
+import { fetchUserNavModules } from '../utils/modules'
+
+// Same sessionStorage entry AdminShell.jsx populates (cleared on logout) and
+// the same split AdminDashboard.jsx uses — read-only here.
+const NAV_CACHE_KEY = 'vehubpro_nav_modules'
+const SERVICE_MODULE_KEYS = new Set([
+  'customers', 'customer_management', 'service-vehicles', 'job-cards', 'invoices', 'quotations', 'services',
+])
 
 const emptyBrand = { name: '', is_active: true, logo_url: null, logo_file: null }
+const emptyBodyType = { code: '', name: '', is_active: true }
 const emptyModel = { brand: '', vehicle_type: '', name: '', is_active: true }
 const emptyFeature = { name: '', category: 'comfort_convenience', is_active: true }
 // Mirrors InventoryFeature.CATEGORY_CHOICES in backend/apps/platform/portfolio/models.py.
@@ -48,6 +61,58 @@ export default function AdminConfiguration() {
   const { theme } = useTenantBranding()
   const [tab, setTab] = useState('brands')
   const { showToast } = useToast()
+
+  // null = still resolving which modules this tenant has — tabs stay hidden
+  // rather than flashing and then disappearing once this settles.
+  const [moduleKeys, setModuleKeys] = useState(() => {
+    try {
+      const raw = sessionStorage.getItem(NAV_CACHE_KEY)
+      const parsed = raw ? JSON.parse(raw) : null
+      return Array.isArray(parsed) ? parsed.map((m) => m.key) : null
+    } catch { return null }
+  })
+
+  useEffect(() => {
+    if (moduleKeys) return
+    let cancelled = false
+    fetchUserNavModules()
+      .then((modules) => {
+        if (cancelled) return
+        setModuleKeys(Array.isArray(modules) ? modules.map((m) => m.key) : [])
+      })
+      .catch((e) => {
+        if (cancelled) return
+        if (e.message === 'SESSION_EXPIRED') { globalThis.location.href = '/admin'; return }
+        setModuleKeys([])
+      })
+    return () => { cancelled = true }
+  }, [moduleKeys])
+
+  const hasServices = Boolean(moduleKeys?.some((k) => SERVICE_MODULE_KEYS.has(k)))
+  const hasPortfolio = Boolean(moduleKeys?.includes('portfolio'))
+
+  // Brands/Models are shared master data used by both Service Vehicles and
+  // Portfolio Inventory; Body Types/Key Features are Portfolio-only; Invoice
+  // Settings only matters to the Services side (invoices come from job cards).
+  const CONFIG_TABS = [
+    { id: 'brands', label: 'Brands', visible: hasServices || hasPortfolio },
+    { id: 'models', label: 'Models', visible: hasServices || hasPortfolio },
+    { id: 'bodyTypes', label: 'Body Types', visible: hasPortfolio },
+    { id: 'features', label: 'Key Features', visible: hasPortfolio },
+    { id: 'invoice', label: 'Invoice Settings', visible: hasServices },
+  ]
+  const visibleTabs = moduleKeys ? CONFIG_TABS.filter((t) => t.visible) : []
+
+  // If the active tab isn't in the resolved, visible set (e.g. modules
+  // finished resolving after mount and hid the default "brands" tab),
+  // fall back to the first tab that's actually shown.
+  useEffect(() => {
+    if (!moduleKeys) return
+    if (visibleTabs.length && !visibleTabs.some((t) => t.id === tab)) {
+      setTab(visibleTabs[0].id)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only re-check when moduleKeys resolves, not on every tab change
+  }, [moduleKeys])
 
   /* Brands */
   const [brandsData, setBrandsData] = useState({ count: 0, next: null, previous: null, results: [] })
@@ -295,6 +360,107 @@ export default function AdminConfiguration() {
     }
   }
 
+  /* Body Types (Portfolio — Hatchback/Sedan/SUV/... global master, not tenant-scoped) */
+  const [bodyTypesList, setBodyTypesList] = useState([])
+  const [bodyTypesLoading, setBodyTypesLoading] = useState(true)
+  const [bodyTypesError, setBodyTypesError] = useState('')
+  const [bodyTypeSearch, setBodyTypeSearch] = useState('')
+  const [bodyTypeModal, setBodyTypeModal] = useState(null)
+  const [bodyTypeModalError, setBodyTypeModalError] = useState('')
+  const [bodyTypeForm, setBodyTypeForm] = useState(emptyBodyType)
+  const [bodyTypeSaving, setBodyTypeSaving] = useState(false)
+  const [bodyTypeDelete, setBodyTypeDelete] = useState(null)
+
+  const loadBodyTypes = useCallback(async () => {
+    setBodyTypesLoading(true)
+    setBodyTypesError('')
+    try {
+      const data = await fetchBodyTypes()
+      setBodyTypesList(Array.isArray(data) ? data : [])
+    } catch (e) {
+      if (e.message === 'SESSION_EXPIRED') {
+        globalThis.location.href = '/admin'
+        return
+      }
+      setBodyTypesError(e.message)
+    } finally {
+      setBodyTypesLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (tab === 'bodyTypes') loadBodyTypes()
+  }, [tab, loadBodyTypes])
+
+  const filteredBodyTypes = useMemo(() => {
+    const q = bodyTypeSearch.trim().toLowerCase()
+    if (!q) return bodyTypesList
+    return bodyTypesList.filter((t) => t.name?.toLowerCase().includes(q) || t.code?.toLowerCase().includes(q))
+  }, [bodyTypesList, bodyTypeSearch])
+
+  const openBodyTypeCreate = () => {
+    setBodyTypeModalError('')
+    setBodyTypeForm(emptyBodyType)
+    setBodyTypeModal('create')
+  }
+  const openBodyTypeEdit = (t) => {
+    setBodyTypeModalError('')
+    setBodyTypeForm({ code: t.code || '', name: t.name || '', is_active: Boolean(t.is_active) })
+    setBodyTypeModal({ type: 'edit', id: t.id })
+  }
+  const closeBodyTypeModal = () => {
+    setBodyTypeModalError('')
+    setBodyTypeModal(null)
+  }
+
+  const saveBodyType = async (e) => {
+    e.preventDefault()
+    setBodyTypeModalError('')
+    const code = bodyTypeForm.code.trim().toLowerCase()
+    const name = bodyTypeForm.name.trim()
+    if (!code || !name) {
+      setBodyTypeModalError('Code and name are required.')
+      return
+    }
+    setBodyTypeSaving(true)
+    try {
+      const payload = { code, name, is_active: bodyTypeForm.is_active }
+      if (bodyTypeModal === 'create') {
+        await createBodyType(payload)
+        showToast('success', 'Body type created.')
+      } else if (bodyTypeModal?.type === 'edit') {
+        await updateBodyType(bodyTypeModal.id, payload)
+        showToast('success', 'Body type updated.')
+      }
+      closeBodyTypeModal()
+      await loadBodyTypes()
+    } catch (err) {
+      if (err.message === 'SESSION_EXPIRED') {
+        globalThis.location.href = '/admin'
+        return
+      }
+      setBodyTypeModalError(err.message || 'Save failed.')
+    } finally {
+      setBodyTypeSaving(false)
+    }
+  }
+
+  const confirmDeleteBodyType = async () => {
+    if (!bodyTypeDelete?.id) return
+    try {
+      await deleteBodyType(bodyTypeDelete.id)
+      showToast('success', 'Body type deleted.')
+      setBodyTypeDelete(null)
+      await loadBodyTypes()
+    } catch (err) {
+      if (err.message === 'SESSION_EXPIRED') {
+        globalThis.location.href = '/admin'
+        return
+      }
+      showToast('error', err.message || 'Delete failed.')
+    }
+  }
+
   /* Models */
   const [modelsData, setModelsData] = useState({ count: 0, next: null, previous: null, results: [] })
   const [modelPage, setModelPage] = useState(1)
@@ -524,16 +690,11 @@ export default function AdminConfiguration() {
         <div className="mx-auto max-w-[1180px] space-y-5">
           <div>
             <h2 className="text-3xl font-bold text-slate-900 dark:text-white">Configuration</h2>
-            <p className="mt-1 text-slate-500 dark:text-slate-400">Manage vehicle brands, models, key features, and invoice settings for your workshop.</p>
+            <p className="mt-1 text-slate-500 dark:text-slate-400">Manage vehicle brands, models, body types, key features, and invoice settings for your workshop.</p>
           </div>
 
           <div className="flex flex-wrap gap-2 rounded-2xl border border-slate-200 bg-white p-2 shadow-sm backdrop-blur-sm dark:border-slate-800/60 dark:bg-slate-900/40">
-            {[
-              ['brands', 'Brands'],
-              ['models', 'Models'],
-              ['features', 'Key Features'],
-              ['invoice', 'Invoice Settings'],
-            ].map(([id, label]) => (
+            {visibleTabs.map(({ id, label }) => (
               <button
                 key={id}
                 type="button"
@@ -548,7 +709,15 @@ export default function AdminConfiguration() {
             ))}
           </div>
 
-          {tab === 'brands' ? (
+          {!moduleKeys ? (
+            <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center text-sm text-slate-500 shadow-sm dark:border-slate-800/60 dark:bg-slate-900/40 dark:text-slate-400">
+              Loading…
+            </div>
+          ) : visibleTabs.length === 0 ? (
+            <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center text-sm text-slate-500 shadow-sm dark:border-slate-800/60 dark:bg-slate-900/40 dark:text-slate-400">
+              No configuration options are available — this requires the Services or Portfolio module.
+            </div>
+          ) : tab === 'brands' ? (
             <div className="space-y-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="relative min-w-[220px] flex-1 max-w-md">
@@ -803,6 +972,79 @@ export default function AdminConfiguration() {
                       Next
                     </button>
                   </div>
+                </div>
+              </div>
+            </div>
+          ) : tab === 'bodyTypes' ? (
+            <div className="space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="relative min-w-[220px] flex-1 max-w-md">
+                  <Search size={17} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500" />
+                  <input
+                    value={bodyTypeSearch}
+                    onChange={(e) => setBodyTypeSearch(e.target.value)}
+                    placeholder="Search body types by name or code..."
+                    className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-10 pr-3 text-sm text-slate-800 outline-none transition focus:border-slate-400 dark:border-slate-800 dark:bg-slate-950/50 dark:text-slate-100 dark:placeholder:text-slate-600 dark:focus:border-slate-700"
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={openBodyTypeCreate}
+                  className="inline-flex items-center gap-2 rounded-xl px-5 py-3 text-sm font-semibold text-white shadow"
+                  style={{ backgroundColor: theme.accent }}
+                >
+                  <Plus size={18} /> Add body type
+                </button>
+              </div>
+              <p className="text-sm text-slate-500 dark:text-slate-400">
+                Car body shapes (Hatchback, Sedan, SUV, ...) offered when adding an Inventory listing in the Portfolio module.
+              </p>
+              {bodyTypesError ? <div className="rounded-xl border border-rose-200 dark:border-rose-900/50 bg-rose-50 dark:bg-rose-900/20 px-4 py-3 text-sm text-rose-800 dark:text-rose-400">{bodyTypesError}</div> : null}
+              <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm backdrop-blur-sm dark:border-slate-800/60 dark:bg-slate-900/40">
+                <div className="overflow-x-auto">
+                  <table className="min-w-full">
+                    <thead className="bg-slate-50 dark:bg-slate-800/50 text-left text-xs font-bold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">
+                      <tr>
+                        <th className="px-6 py-4">Name</th>
+                        <th className="px-6 py-4">Code</th>
+                        <th className="px-6 py-4">Status</th>
+                        <th className="px-6 py-4 w-40">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-sm">
+                      {bodyTypesLoading ? (
+                        <tr>
+                          <td colSpan={4} className="px-6 py-8 text-slate-500 dark:text-slate-400">Loading…</td>
+                        </tr>
+                      ) : filteredBodyTypes.length === 0 ? (
+                        <tr>
+                          <td colSpan={4} className="px-6 py-8 text-slate-500 dark:text-slate-400">No body types found.</td>
+                        </tr>
+                      ) : (
+                        filteredBodyTypes.map((t) => (
+                          <tr key={t.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40">
+                            <td className="px-6 py-3 font-medium text-slate-900 dark:text-white">{t.name}</td>
+                            <td className="px-6 py-3 font-mono text-xs text-slate-500 dark:text-slate-400">{t.code}</td>
+                            <td className="px-6 py-3">
+                              <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${t.is_active ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400' : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'}`}>
+                                {t.is_active ? 'Active' : 'Inactive'}
+                              </span>
+                            </td>
+                            <td className="px-6 py-3">
+                              <div className="flex gap-1 text-slate-500 dark:text-slate-400">
+                                <button type="button" className="rounded-lg p-2 hover:bg-slate-100 dark:hover:bg-slate-800" title="Edit" onClick={() => openBodyTypeEdit(t)}>
+                                  <Pencil size={16} />
+                                </button>
+                                <button type="button" className="rounded-lg p-2 hover:bg-rose-50 dark:hover:bg-rose-900/20 text-rose-600" title="Delete" onClick={() => setBodyTypeDelete(t)}>
+                                  <Trash2 size={16} />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
                 </div>
               </div>
             </div>
@@ -1281,6 +1523,95 @@ export default function AdminConfiguration() {
                 Cancel
               </button>
               <button type="button" className="rounded-xl bg-rose-600 px-4 py-2 text-sm font-semibold text-white" onClick={confirmDeleteFeature}>
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {/* Body type modal */}
+      {bodyTypeModal ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl dark:border-slate-800/60 dark:bg-slate-950">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-bold text-slate-900 dark:text-white">{bodyTypeModal === 'create' ? 'New body type' : 'Edit body type'}</h3>
+              <button type="button" className="rounded-lg p-2 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800" onClick={closeBodyTypeModal}>
+                <X size={18} />
+              </button>
+            </div>
+            <form onSubmit={saveBodyType} className="mt-4 space-y-4">
+              {bodyTypeModalError ? (
+                <div className="rounded-xl border border-rose-300 dark:border-rose-800 bg-rose-50 dark:bg-rose-900/20 px-3 py-2 text-sm text-rose-700 dark:text-rose-400">{bodyTypeModalError}</div>
+              ) : null}
+              <div>
+                <label className="mb-1 block text-xs font-semibold text-slate-500 dark:text-slate-400">Name</label>
+                <input
+                  value={bodyTypeForm.name}
+                  onChange={(e) => {
+                    setBodyTypeModalError('')
+                    setBodyTypeForm((p) => ({ ...p, name: e.target.value }))
+                  }}
+                  className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 px-3 py-2.5 text-sm outline-none focus:border-slate-400 dark:focus:border-slate-600 placeholder:text-slate-400 dark:placeholder:text-slate-600"
+                  placeholder="e.g. Hatchback"
+                />
+              </div>
+
+              <div>
+                <label className="mb-1 block text-xs font-semibold text-slate-500 dark:text-slate-400">Code</label>
+                <input
+                  value={bodyTypeForm.code}
+                  onChange={(e) => {
+                    setBodyTypeModalError('')
+                    setBodyTypeForm((p) => ({ ...p, code: e.target.value }))
+                  }}
+                  className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 px-3 py-2.5 text-sm font-mono outline-none focus:border-slate-400 dark:focus:border-slate-600 placeholder:text-slate-400 dark:placeholder:text-slate-600"
+                  placeholder="e.g. hatchback"
+                />
+                <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">Lowercase, no spaces — used internally, never shown to customers.</p>
+              </div>
+
+              <label className="flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-200">
+                <input
+                  type="checkbox"
+                  checked={bodyTypeForm.is_active}
+                  onChange={(e) => setBodyTypeForm((p) => ({ ...p, is_active: e.target.checked }))}
+                  className="h-4 w-4 rounded border-slate-300 dark:border-slate-700"
+                  style={{ accentColor: theme.accent }}
+                />
+                Active
+              </label>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <button type="button" className="rounded-xl px-4 py-2 text-sm font-semibold text-slate-600 dark:text-slate-400" onClick={closeBodyTypeModal}>
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={bodyTypeSaving}
+                  className="rounded-xl px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+                  style={{ backgroundColor: theme.accent }}
+                >
+                  {bodyTypeSaving ? 'Saving…' : bodyTypeModal === 'create' ? 'Save' : 'Update'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      ) : null}
+
+      {bodyTypeDelete ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 p-6 shadow-2xl">
+            <h3 className="text-lg font-bold text-slate-900 dark:text-white">Delete body type</h3>
+            <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
+              Delete <span className="font-semibold">{bodyTypeDelete.name}</span>? This will fail if any inventory vehicle uses it — deactivate it instead if you just want to hide it from new listings.
+            </p>
+            <div className="mt-5 flex justify-end gap-2">
+              <button type="button" className="rounded-xl px-4 py-2 text-sm font-semibold text-slate-600 dark:text-slate-400" onClick={() => setBodyTypeDelete(null)}>
+                Cancel
+              </button>
+              <button type="button" className="rounded-xl bg-rose-600 px-4 py-2 text-sm font-semibold text-white" onClick={confirmDeleteBodyType}>
                 Delete
               </button>
             </div>

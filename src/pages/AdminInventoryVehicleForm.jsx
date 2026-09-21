@@ -5,15 +5,13 @@ import AdminShell from '../components/AdminShell'
 import SearchableSelect from '../components/SearchableSelect'
 import { useToast } from '../context/ToastContext.jsx'
 import { useTenantBranding } from '../context/TenantBrandingContext.jsx'
-import { fetchBrands, fetchFuelTypes, fetchModels, fetchVehicleTypes } from '../utils/vehicles'
+import { fetchBodyTypes, fetchBrands, fetchFuelTypes, fetchModels } from '../utils/vehicles'
 import {
   createInventoryVehicle,
   fetchInventoryFeatures,
   getInventoryVehicle,
   updateInventoryVehicle,
 } from '../utils/inventoryVehicles'
-
-const BODY_TYPE_CODES = new Set(['hatchback', 'sedan', 'suv', 'muv', 'luxury_sedan', 'luxury_suv'])
 
 // Mirrors InventoryFeature.CATEGORY_CHOICES in backend/apps/platform/portfolio/models.py
 // (also duplicated in AdminConfiguration.jsx) — order here is the display order below.
@@ -153,7 +151,7 @@ export default function AdminInventoryVehicleForm() {
 
   const [brands, setBrands] = useState([])
   const [modelsForBrand, setModelsForBrand] = useState([])
-  const [vehicleTypes, setVehicleTypes] = useState([])
+  const [bodyTypes, setBodyTypes] = useState([])
   const [fuelTypes, setFuelTypes] = useState([])
   const [features, setFeatures] = useState([])
 
@@ -168,8 +166,8 @@ export default function AdminInventoryVehicleForm() {
     fetchBrands({ page: 1, pageSize: 200, isActive: true })
       .then((data) => setBrands(data?.results || []))
       .catch(() => {})
-    fetchVehicleTypes()
-      .then((data) => setVehicleTypes(Array.isArray(data) ? data : []))
+    fetchBodyTypes()
+      .then((data) => setBodyTypes(Array.isArray(data) ? data : []))
       .catch(() => {})
     fetchInventoryFeatures({ page: 1, pageSize: 200, isActive: true })
       .then((data) => setFeatures(data?.results || []))
@@ -219,15 +217,7 @@ export default function AdminInventoryVehicleForm() {
 
   const brandOptions = brands.map((b) => ({ id: b.id, name: b.name }))
   const modelOptions = modelsForBrand.map((m) => ({ id: m.id, name: m.name }))
-  // Restricted to the seeded body-type codes (see
-  // backend/apps/platform/vehicles/migrations/0011_seed_body_type_vehicle_types.py)
-  // so every listing lands in one of the buckets the public portfolio's
-  // "Browse by Body Type" section actually filters by — the shared VehicleType
-  // master also holds generic, non-body types (e.g. "Car", "Bus") used by the
-  // service-vehicle form, which would never match any body-type bucket.
-  const vehicleTypeOptions = vehicleTypes
-    .filter((t) => BODY_TYPE_CODES.has(t.code))
-    .map((t) => ({ id: t.id, name: t.name }))
+  const bodyTypeOptions = bodyTypes.map((t) => ({ id: t.id, name: t.name }))
   const fuelTypeOptions = fuelTypes.map((f) => ({ id: f.id, name: f.name }))
   const featureGroups = FEATURE_CATEGORY_ORDER
     .map((cat) => ({ ...cat, features: features.filter((f) => f.category === cat.value) }))
@@ -405,7 +395,7 @@ export default function AdminInventoryVehicleForm() {
                 <label className={labelCls}>Body Type <span className="text-rose-500">*</span></label>
                 <SearchableSelect
                   value={form.vehicle_type}
-                  options={vehicleTypeOptions}
+                  options={bodyTypeOptions}
                   onChange={(v) => setForm((p) => ({ ...p, vehicle_type: v }))}
                   placeholder="Select body type"
                   searchPlaceholder="Search body types…"

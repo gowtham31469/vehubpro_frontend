@@ -13,6 +13,39 @@ export async function fetchVehicleTypes() {
   return parseResponse('/api/v1/vehicles/types/', { method: 'GET' }, 'Failed to fetch vehicle types.')
 }
 
+/** Global masters (not tenant-scoped) — car body shapes (Hatchback, Sedan, ...), used by InventoryVehicle only. */
+export async function fetchBodyTypes() {
+  return parseResponse('/api/v1/vehicles/body-types/', { method: 'GET' }, 'Failed to fetch body types.')
+}
+
+export async function createBodyType(payload) {
+  return parseResponse(
+    '/api/v1/vehicles/body-types/',
+    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) },
+    'Failed to create body type.',
+  )
+}
+
+export async function updateBodyType(bodyTypeId, payload) {
+  return parseResponse(
+    `/api/v1/vehicles/body-types/${bodyTypeId}/`,
+    { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) },
+    'Failed to update body type.',
+  )
+}
+
+export async function patchBodyType(bodyTypeId, payload) {
+  return parseResponse(
+    `/api/v1/vehicles/body-types/${bodyTypeId}/`,
+    { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) },
+    'Failed to update body type.',
+  )
+}
+
+export async function deleteBodyType(bodyTypeId) {
+  return parseResponse(`/api/v1/vehicles/body-types/${bodyTypeId}/`, { method: 'DELETE' }, 'Failed to delete body type.')
+}
+
 export async function fetchFuelTypes() {
   return parseResponse('/api/v1/vehicles/fuel-types/', { method: 'GET' }, 'Failed to fetch fuel types.')
 }

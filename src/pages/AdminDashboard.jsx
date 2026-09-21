@@ -228,7 +228,7 @@ export default function AdminDashboard() {
                 <p className="text-sm font-medium text-slate-500 dark:text-slate-400">{label}</p>
                 {loading
                   ? <Skeleton className="mt-2 h-10 w-24" />
-                  : <p className="mt-1 text-4xl font-bold text-slate-900 dark:text-white">{value}</p>
+                  : <p className="mt-1 break-words text-2xl font-bold text-slate-900 dark:text-white">{value}</p>
                 }
               </div>
             ))}
@@ -417,7 +417,7 @@ export default function AdminDashboard() {
                 <p className="text-sm font-medium text-slate-500 dark:text-slate-400">{label}</p>
                 {portfolioLoading
                   ? <Skeleton className="mt-2 h-10 w-24" />
-                  : <p className="mt-1 text-4xl font-bold text-slate-900 dark:text-white">{value}</p>
+                  : <p className="mt-1 break-words text-2xl font-bold text-slate-900 dark:text-white">{value}</p>
                 }
               </div>
             ))}

@@ -60,7 +60,7 @@ function KpiCard({ icon: Icon, label, value, accent, accentSoft }) {
         <Icon size={20} strokeWidth={2.2} />
       </div>
       <p className="text-sm font-medium text-slate-500 dark:text-slate-400">{label}</p>
-      <p className="mt-1 text-2xl font-bold text-slate-900 dark:text-white">{value}</p>
+      <p className="mt-1 break-words text-xl font-bold text-slate-900 dark:text-white">{value}</p>
     </div>
   )
 }

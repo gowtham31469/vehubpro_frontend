@@ -1174,8 +1174,11 @@ export default function AdminJobCardEditor() {
             </div>
           )}
 
-          {/* Vehicle — full width; customer shown compactly inline (auto-filled from vehicle) */}
-          <div className="mb-6">
+          {/* Vehicle — full width; customer shown compactly inline (auto-filled from vehicle).
+              relative z-20: this section's backdrop-blur-sm creates its own stacking
+              context, which otherwise traps the search dropdown's z-50 below the
+              "Add services"/"Financial summary" sections that follow it in the DOM. */}
+          <div className="relative z-20 mb-6">
             <section
               className="rounded-xl border border-slate-200 bg-white p-4 shadow-[0_1px_3px_rgba(15,23,42,0.06)] backdrop-blur-sm dark:border-slate-800 dark:bg-slate-900/40"
               aria-labelledby="veh-heading"
