@@ -44,7 +44,7 @@ export default function PublicContact() {
       {/* Header */}
       <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 shadow-sm backdrop-blur-xl">
         <div className="mx-auto flex max-w-[1240px] items-center justify-between px-6 py-4">
-          <Link to="/portfolio" className="flex items-center gap-2.5">
+          <Link to="/" className="flex items-center gap-2.5">
             {brandingLogoUrl ? (
               <img src={brandingLogoUrl} alt={tenantName} className="h-9 w-9 rounded-lg object-contain" />
             ) : (
@@ -55,7 +55,7 @@ export default function PublicContact() {
             <span className="text-lg font-extrabold uppercase tracking-tight text-slate-900">{tenantName || 'Showroom'}</span>
           </Link>
           <nav className="hidden items-center gap-8 text-sm font-semibold text-slate-500 md:flex">
-            <Link to="/portfolio" className="transition hover:text-slate-900">Home</Link>
+            <Link to="/" className="transition hover:text-slate-900">Home</Link>
             <Link to="/portfolio/inventory" className="transition hover:text-slate-900">Inventory</Link>
             <span className="text-slate-900">Contact</span>
           </nav>

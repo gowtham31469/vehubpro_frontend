@@ -20,7 +20,6 @@ import AdminUsers from './pages/AdminUsers'
 import AdminPortfolio from './pages/AdminPortfolio'
 import AdminInventoryVehicles from './pages/AdminInventoryVehicles'
 import AdminInventoryVehicleForm from './pages/AdminInventoryVehicleForm'
-import PublicLanding from './pages/PublicLanding'
 import PublicPortfolio from './pages/PublicPortfolio'
 import PublicInventoryListing from './pages/PublicInventoryListing'
 import PublicVehicleDetail from './pages/PublicVehicleDetail'
@@ -38,8 +37,7 @@ export default function App() {
   return (
     <Routes>
       <Route path="/admin" element={<AdminLogin />} />
-      <Route path="/" element={<PublicLanding />} />
-      <Route path="/portfolio" element={<PublicPortfolio />} />
+      <Route path="/" element={<PublicPortfolio />} />
       <Route path="/portfolio/inventory" element={<PublicInventoryListing />} />
       <Route path="/portfolio/inventory/:id" element={<PublicVehicleDetail />} />
       <Route path="/portfolio/contact" element={<PublicContact />} />
