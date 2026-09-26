@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Check, ChevronDown, ImagePlus, Pencil, Plus, Search, Trash2, Upload, Wrench, X } from 'lucide-react'
+import { Check, ChevronDown, ImagePlus, Pencil, Plus, Search, Star, Trash2, Upload, Wrench, X } from 'lucide-react'
 import AdminShell from '../components/AdminShell'
 import { useToast } from '../context/ToastContext.jsx'
 import { useTenantBranding } from '../context/TenantBrandingContext.jsx'
@@ -17,7 +17,7 @@ import {
   uploadServiceItemImage,
 } from '../utils/services'
 
-const emptyCategory = { name: '', applicable_vehicle_types: [], is_active: true }
+const emptyCategory = { name: '', applicable_vehicle_types: [], is_active: true, is_featured: false }
 const SERVICE_TYPE_OPTIONS = [
   { value: 'labour', label: 'Labour' },
   { value: 'part', label: 'Part' },
@@ -28,7 +28,7 @@ const PRICE_TYPE_OPTIONS = [
   { value: 'inclusive', label: 'Inclusive of GST', hint: 'Base price already includes GST.' },
 ]
 
-const emptyItem = { category: '', name: '', description: '', service_type: '', base_price: '', hsn_code: '', gst_percentage: '', price_type: 'exclusive', applicable_vehicle_types: [], is_active: true }
+const emptyItem = { category: '', name: '', description: '', service_type: '', base_price: '', hsn_code: '', gst_percentage: '', price_type: 'exclusive', applicable_vehicle_types: [], is_active: true, is_featured: false }
 
 export default function AdminServices() {
   const { theme } = useTenantBranding()
@@ -132,6 +132,7 @@ export default function AdminServices() {
       name: c.name || '',
       applicable_vehicle_types: c.applicable_vehicle_types || [],
       is_active: Boolean(c.is_active),
+      is_featured: Boolean(c.is_featured),
     })
     setIsVtCatDropdownOpen(false)
     setCatModal({ type: 'edit', id: c.id })
@@ -150,6 +151,7 @@ export default function AdminServices() {
         sort_order: catModal === 'create' ? 0 : categoryPreserveRef.current.sort_order,
         applicable_vehicle_types: catForm.applicable_vehicle_types,
         is_active: catForm.is_active,
+        is_featured: catForm.is_featured,
         icon_code: categoryPreserveRef.current.icon_code || null,
       }
       if (catModal === 'create') {
@@ -350,6 +352,7 @@ export default function AdminServices() {
       price_type: item.price_type || 'exclusive',
       applicable_vehicle_types: item.applicable_vehicle_types || [],
       is_active: Boolean(item.is_active),
+      is_featured: Boolean(item.is_featured),
     })
     setItemImageFile(null)
     setItemImagePreview(null)
@@ -391,6 +394,7 @@ export default function AdminServices() {
         unit_type: 'per_service',
         applicable_vehicle_types: itemForm.applicable_vehicle_types,
         is_active: itemForm.is_active,
+        is_featured: itemForm.is_featured,
       }
       let savedId
       if (itemModal === 'create') {
@@ -780,6 +784,30 @@ export default function AdminServices() {
                 </div>
               </div>
 
+              <button
+                type="button"
+                onClick={() => setCatForm((p) => ({ ...p, is_featured: !p.is_featured }))}
+                className="flex w-full items-center gap-3 rounded-xl border px-4 py-3 text-left transition"
+                style={
+                  catForm.is_featured
+                    ? { borderColor: theme.accent, backgroundColor: theme.accentSoft }
+                    : undefined
+                }
+              >
+                <Star
+                  size={18}
+                  className="shrink-0"
+                  style={{ color: catForm.is_featured ? theme.accent : '#94a3b8' }}
+                  fill={catForm.is_featured ? theme.accent : 'none'}
+                />
+                <span>
+                  <span className="block text-sm font-bold text-slate-900 dark:text-white">Featured on homepage</span>
+                  <span className="block text-xs text-slate-500 dark:text-slate-400">
+                    Only categories flagged here appear as chips in the public homepage's "Browse by Category" section — every category still shows on the full services page.
+                  </span>
+                </span>
+              </button>
+
               <div className="flex justify-end gap-2 pt-2">
                 <button type="button" className="rounded-xl px-4 py-2 text-sm font-semibold text-slate-600 dark:text-slate-400" onClick={closeCatModal}>Cancel</button>
                 <button
@@ -1131,6 +1159,30 @@ export default function AdminServices() {
                   </button>
                 )}
               </div>
+
+              <button
+                type="button"
+                onClick={() => setItemForm((p) => ({ ...p, is_featured: !p.is_featured }))}
+                className="flex w-full items-center gap-3 rounded-xl border px-4 py-3 text-left transition"
+                style={
+                  itemForm.is_featured
+                    ? { borderColor: theme.accent, backgroundColor: theme.accentSoft }
+                    : undefined
+                }
+              >
+                <Star
+                  size={18}
+                  className="shrink-0"
+                  style={{ color: itemForm.is_featured ? theme.accent : '#94a3b8' }}
+                  fill={itemForm.is_featured ? theme.accent : 'none'}
+                />
+                <span>
+                  <span className="block text-sm font-bold text-slate-900 dark:text-white">Featured on homepage</span>
+                  <span className="block text-xs text-slate-500 dark:text-slate-400">
+                    Only services flagged here appear in the public homepage's "Popular Services" section.
+                  </span>
+                </span>
+              </button>
 
               <div className="flex justify-end gap-2 pt-2">
                 <button type="button" className="rounded-xl px-4 py-2 text-sm font-semibold text-slate-600 dark:text-slate-400" onClick={closeItemModal}>Cancel</button>

@@ -413,6 +413,8 @@ export default function PublicInventoryListing() {
     )
   }
 
+  const hasServices = branding?.has_services_access === true
+
   return (
     <div className="min-h-screen bg-[#F6F5FA] font-sans">
       {/* Header */}
@@ -431,6 +433,9 @@ export default function PublicInventoryListing() {
           <nav className="hidden items-center gap-8 text-sm font-semibold text-slate-500 md:flex">
             <Link to="/" className="transition hover:text-slate-900">Home</Link>
             <span className="text-slate-900">Inventory</span>
+            {hasServices ? (
+              <Link to="/portfolio/services" className="transition hover:text-slate-900">Services</Link>
+            ) : null}
             <Link to="/portfolio/contact" className="transition hover:text-slate-900">Contact</Link>
           </nav>
         </div>

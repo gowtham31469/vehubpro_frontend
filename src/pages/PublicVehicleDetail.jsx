@@ -104,6 +104,8 @@ export default function PublicVehicleDetail() {
     )
   }
 
+  const hasServices = branding?.has_services_access === true
+
   const photos = vehicle?.photo_urls || []
   // Backend already nulls both fields out once offer_valid_until has passed,
   // so a non-null original_price here always means a live, valid offer.
@@ -133,6 +135,9 @@ export default function PublicVehicleDetail() {
           <nav className="hidden items-center gap-8 text-sm font-semibold text-slate-500 md:flex">
             <Link to="/" className="transition hover:text-slate-900">Home</Link>
             <Link to="/portfolio/inventory" className="text-slate-900">Inventory</Link>
+            {hasServices ? (
+              <Link to="/portfolio/services" className="transition hover:text-slate-900">Services</Link>
+            ) : null}
             <Link to="/portfolio/contact" className="transition hover:text-slate-900">Contact</Link>
           </nav>
         </div>
