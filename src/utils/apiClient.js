@@ -198,5 +198,14 @@ export async function apiFetchBlob(path, options = {}) {
 }
 
 export function unwrapData(payload) {
-  return payload?.data ?? payload
+  // `payload?.data ?? payload` looks equivalent but isn't: `??` treats an
+  // explicit `data: null` (a valid envelope meaning "no record yet" — e.g.
+  // GET acquisition/invoice/settlement before one has been created) the same
+  // as a missing `data` key, and falls back to returning the whole envelope
+  // object instead of null. Callers that then do `if (data) {...}` see a
+  // truthy (but bogus) object. Only fall back when the key is genuinely absent.
+  if (payload && typeof payload === 'object' && 'data' in payload) {
+    return payload.data
+  }
+  return payload
 }

@@ -8,6 +8,7 @@ import ReactDOM from 'react-dom'
 import { useTenantBranding } from '../context/TenantBrandingContext.jsx'
 import { clearSession, getCurrentUser } from '../utils/apiClient'
 import { fetchUserNavModules } from '../utils/modules.js'
+import NotificationBell from './NotificationBell.jsx'
 import { useState, useRef, useEffect } from 'react'
 
 const SIDEBAR_KEY = 'vehubpro_admin_sidebar_collapsed'
@@ -95,6 +96,19 @@ const SUBMODULE_ROUTE_MAP = {
   'portfolio_insights':  '/admin/portfolio',
   'inventory_vehicles':  '/admin/portfolio/inventory',
   'inventory-vehicles':  '/admin/portfolio/inventory',
+  'visit_requests':      '/admin/portfolio/visit-requests',
+  'visit-requests':      '/admin/portfolio/visit-requests',
+  // Vehicle Work & Expenses / Sales, Booking & Delivery are tabs on the
+  // Inventory Vehicles detail page, not standalone list pages — both
+  // resolve to the same inventory list as their nav entry point.
+  // dedupeByResolvedRoute() (below) collapses the resulting duplicate rows
+  // into the single "Inventory Vehicles" link; which tabs actually render
+  // once a vehicle is opened is gated by the user's own granted permissions
+  // (see AdminVehicleDetail.jsx's PERMISSION_FOR_TAB).
+  'vehicle_work_expenses': '/admin/portfolio/inventory',
+  'vehicle-work-expenses': '/admin/portfolio/inventory',
+  'vehicle_sales':         '/admin/portfolio/inventory',
+  'vehicle-sales':         '/admin/portfolio/inventory',
 }
 
 // Normalize to kebab-case for fuzzy matching (handles snake_case, spaces, mixed case)
@@ -281,12 +295,43 @@ function SidebarAccordion({ moduleKey, label, icon: Icon, accent, collapsed, sub
   )
 }
 
+// A staff member can be granted several submodules that all resolve to the
+// same frontend destination (e.g. Vehicle Work & Expenses and Sales, Booking
+// & Delivery are both tabs on the Inventory Vehicles detail page, not
+// standalone list pages) — collapse those to one row instead of showing
+// several identical-destination links that all highlight together.
+function dedupeByResolvedRoute(moduleKey, submodules) {
+  const routeOf = (sub) => resolveSubmoduleRoute(moduleKey, sub.key, sub.name)
+
+  // Alphabetical tie-break so a stable, predictable submodule (not whichever
+  // the API happened to list first) wins the label for a shared route — e.g.
+  // "Inventory Vehicles" over "Sales, Booking & Delivery" for the destination
+  // they both resolve to. Original relative order is preserved for the
+  // winners themselves, so modules with no collisions are unaffected.
+  const winnerByRoute = new Map()
+  for (const sub of submodules) {
+    const route = routeOf(sub)
+    const current = winnerByRoute.get(route)
+    if (!current || sub.name.localeCompare(current.name) < 0) winnerByRoute.set(route, sub)
+  }
+
+  const includedRoutes = new Set()
+  const result = []
+  for (const sub of submodules) {
+    const route = routeOf(sub)
+    if (winnerByRoute.get(route) !== sub || includedRoutes.has(route)) continue
+    includedRoutes.add(route)
+    result.push(sub)
+  }
+  return result
+}
+
 // ── Nav item dispatcher ───────────────────────────────────────────────────────
 function NavItem({ module, accent, collapsed }) {
   const meta = MODULE_META[module.key]
   if (!meta) return null
 
-  const { submodules = [] } = module
+  const submodules = dedupeByResolvedRoute(module.key, module.submodules || [])
 
   if (submodules.length > 1) {
     return (
@@ -301,10 +346,17 @@ function NavItem({ module, accent, collapsed }) {
     )
   }
 
-  // Single submodule or none → direct link using module's canonical route
+  // Exactly one submodule → link straight to that submodule's own route
+  // (not the module's generic hub, which may just be a "coming soon" page
+  // the staff member has no other way to navigate past). No submodules at
+  // all → the module's canonical route is the only option.
+  const singleSubmoduleRoute = submodules.length === 1
+    ? resolveSubmoduleRoute(module.key, submodules[0].key, submodules[0].name)
+    : meta.to
+
   return (
     <SidebarLink
-      to={meta.to}
+      to={singleSubmoduleRoute}
       label={module.name}
       icon={meta.icon}
       accent={accent}
@@ -480,6 +532,8 @@ export default function AdminShell({ children }) {
                 <Moon size={16} />
               </button>
             </div>
+
+            <NotificationBell />
 
             {/* Profile dropdown */}
             <button

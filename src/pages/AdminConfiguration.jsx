@@ -159,7 +159,7 @@ export default function AdminConfiguration() {
 
   const loadAllBrands = useCallback(async () => {
     try {
-      const data = await fetchBrands({ page: 1, pageSize: 100, isActive: true })
+      const data = await fetchBrands({ pageSize: 'all', isActive: true })
       setBrandAll(data.results || [])
     } catch {
       setBrandAll([])
@@ -604,7 +604,7 @@ export default function AdminConfiguration() {
     let list = brandAll
     if (!list.length) {
       try {
-        const data = await fetchBrands({ page: 1, pageSize: 100, isActive: true })
+        const data = await fetchBrands({ pageSize: 'all', isActive: true })
         list = data.results || []
         setBrandAll(list)
       } catch {

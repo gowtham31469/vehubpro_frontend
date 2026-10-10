@@ -28,6 +28,15 @@ body {
   filter: invert(1);
 }
 
+/* The public storefront (PublicVehicleDetail.jsx's "Book a Visit" modal) has
+   its own fixed light theme, deliberately not dark-mode-aware — but the .dark
+   class above is applied to <html> app-wide when a visitor's OS prefers dark
+   mode, which would otherwise invert this icon to white on its light
+   background and make it invisible. Override back to normal here. */
+#preferredDate::-webkit-calendar-picker-indicator {
+  filter: none;
+}
+
 @media print {
   body * { visibility: hidden; }
   #invoice-print, #invoice-print * { visibility: visible; }

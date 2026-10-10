@@ -345,7 +345,7 @@ export default function AdminCustomers() {
             <div className="flex flex-wrap items-end justify-between gap-3">
               <div>
                 <h2 className="text-3xl font-bold text-slate-900 dark:text-white">Customer Management</h2>
-                <p className="mt-1 text-slate-500 dark:text-slate-400">Detailed database of all registered service center clients and their vehicles.</p>
+                <p className="mt-1 text-slate-500 dark:text-slate-400">Detailed database of all your registered customers — shared across Services and Portfolio.</p>
               </div>
               {!isModalOpen ? (
                 <button type="button" onClick={openCreate} className="inline-flex items-center gap-2 rounded-xl px-5 py-3 text-sm font-semibold text-white shadow transition-opacity hover:opacity-90" style={{ backgroundColor: theme.accent }}>

@@ -17,7 +17,7 @@ export async function fetchPublicInventoryVehicles(subdomain, { limit } = {}) {
   return payload?.data ?? []
 }
 
-/** Single-vehicle detail for the "View Details" page — 404s if sold/booked/archived. */
+/** Single-vehicle detail for the "View Details" page — 404s if sold/delivered/archived (booked stays visible). */
 export async function fetchPublicInventoryVehicleDetail(subdomain, id) {
   if (!API_BASE_URL) throw new Error('Missing VITE_API_BASE_URL')
   if (!subdomain) throw new Error('No tenant subdomain detected.')

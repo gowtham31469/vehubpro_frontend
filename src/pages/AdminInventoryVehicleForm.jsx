@@ -163,13 +163,13 @@ export default function AdminInventoryVehicleForm() {
   const fileInputRef = useRef(null)
 
   useEffect(() => {
-    fetchBrands({ page: 1, pageSize: 200, isActive: true })
+    fetchBrands({ pageSize: 'all', isActive: true })
       .then((data) => setBrands(data?.results || []))
       .catch(() => {})
     fetchBodyTypes()
       .then((data) => setBodyTypes(Array.isArray(data) ? data : []))
       .catch(() => {})
-    fetchInventoryFeatures({ page: 1, pageSize: 200, isActive: true })
+    fetchInventoryFeatures({ pageSize: 'all', isActive: true })
       .then((data) => setFeatures(data?.results || []))
       .catch(() => {})
   }, [])
@@ -177,7 +177,7 @@ export default function AdminInventoryVehicleForm() {
   useEffect(() => {
     if (!form.brand) { setModelsForBrand([]); return }
     let cancelled = false
-    fetchModels({ page: 1, pageSize: 200, brandId: form.brand, isActive: true })
+    fetchModels({ pageSize: 'all', brandId: form.brand, isActive: true })
       .then((data) => { if (!cancelled) setModelsForBrand(data.results || []) })
       .catch(() => { if (!cancelled) setModelsForBrand([]) })
     return () => { cancelled = true }

@@ -9,13 +9,14 @@ async function parseResponse(path, options, fallbackError) {
 }
 
 /** Service Categories */
-export async function fetchServiceCategories({ page = 1, pageSize = 10, isArchived = false, isActive } = {}) {
+export async function fetchServiceCategories({ page = 1, pageSize = 10, isArchived = false, isActive, search = '' } = {}) {
   const params = new URLSearchParams({
     page: String(page),
     page_size: String(pageSize),
     is_archive: String(Boolean(isArchived)),
   })
   if (isActive !== undefined) params.set('is_active', String(Boolean(isActive)))
+  if (search.trim()) params.set('search', search.trim())
   return parseResponse(`/api/v1/services/categories/?${params.toString()}`, { method: 'GET' }, 'Failed to fetch service categories.')
 }
 
@@ -48,7 +49,25 @@ export async function deleteServiceCategory(id) {
 }
 
 /** Service Items */
-export async function fetchServiceItems({ page = 1, pageSize = 10, categoryId, isArchived = false, isActive } = {}) {
+export async function uploadServiceCategoryImage(id, file) {
+  const formData = new FormData()
+  formData.append('image', file)
+  return parseResponse(
+    `/api/v1/services/categories/${id}/image/`,
+    { method: 'PUT', body: formData },
+    'Failed to upload service category image.',
+  )
+}
+
+export async function deleteServiceCategoryImage(id) {
+  return parseResponse(
+    `/api/v1/services/categories/${id}/image/`,
+    { method: 'DELETE' },
+    'Failed to remove service category image.',
+  )
+}
+
+export async function fetchServiceItems({ page = 1, pageSize = 10, categoryId, isArchived = false, isActive, search = '' } = {}) {
   const params = new URLSearchParams({
     page: String(page),
     page_size: String(pageSize),
@@ -56,6 +75,7 @@ export async function fetchServiceItems({ page = 1, pageSize = 10, categoryId, i
   })
   if (categoryId) params.set('category_id', categoryId)
   if (isActive !== undefined) params.set('is_active', String(Boolean(isActive)))
+  if (search.trim()) params.set('search', search.trim())
   return parseResponse(`/api/v1/services/items/?${params.toString()}`, { method: 'GET' }, 'Failed to fetch service items.')
 }
 

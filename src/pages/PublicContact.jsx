@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import QRCode from 'qrcode'
 import { Camera, Car, MapPin, MessageCircle, Phone } from 'lucide-react'
 import { useTenantBranding } from '../context/TenantBrandingContext.jsx'
+import AccountNav from '../components/public/AccountNav.jsx'
 
 // Fixed portfolio theme — same palette as PublicPortfolio.jsx/PublicVehicleDetail.jsx,
 // deliberately NOT the tenant's dynamic brand color (theme.accent/accentSoft).
@@ -82,6 +83,7 @@ export default function PublicContact() {
               <Link to="/portfolio/services" className="transition hover:text-slate-900">Services</Link>
             ) : null}
             <span className="text-slate-900">Contact</span>
+            <AccountNav />
           </nav>
         </div>
       </header>

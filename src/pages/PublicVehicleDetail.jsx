@@ -1,9 +1,18 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
-import { ArrowLeft, Car, Check, ChevronLeft, ChevronRight, Cog, Copy, Fuel, Gauge, Mail, Share2, ShieldCheck, Sparkles } from 'lucide-react'
+import { Link, useNavigate, useParams } from 'react-router-dom'
+import { ArrowLeft, Calendar, Car, Check, CheckCircle2, ChevronLeft, ChevronRight, Cog, Copy, Fuel, Gauge, Heart, Mail, Share2, ShieldCheck, Sparkles, X } from 'lucide-react'
 import { useTenantBranding } from '../context/TenantBrandingContext.jsx'
 import { useToast } from '../context/ToastContext.jsx'
 import { fetchPublicInventoryVehicleDetail } from '../utils/publicPortfolio'
+import AccountNav from '../components/public/AccountNav.jsx'
+import {
+  addToWishlist,
+  bookVisit,
+  fetchMyVisitRequests,
+  fetchWishlist,
+  isCustomerAuthenticated,
+  removeFromWishlist,
+} from '../utils/customerAuth'
 
 // Fixed portfolio theme — same palette as PublicPortfolio.jsx/PublicContact.jsx,
 // deliberately NOT the tenant's dynamic brand color (theme.accent/accentSoft).
@@ -13,6 +22,16 @@ const BTN_SHADOW = '0 10px 25px -8px rgba(75, 17, 107, 0.5)'
 
 function fmtMoney(n) {
   return `₹${Number(n || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`
+}
+
+// Local YYYY-MM-DD for the date input's `min` — not toISOString(), which
+// converts to UTC and can shift the date near midnight in some timezones.
+function todayLocalDateString() {
+  const d = new Date()
+  const year = d.getFullYear()
+  const month = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
 }
 
 function isNewListing(createdAt) {
@@ -33,6 +52,7 @@ const FEATURE_CATEGORY_ORDER = [
 
 export default function PublicVehicleDetail() {
   const { id } = useParams()
+  const navigate = useNavigate()
   const { branding, brandingLogoUrl, tenantName, subdomain, tenantError } = useTenantBranding()
   const { showToast } = useToast()
 
@@ -40,8 +60,61 @@ export default function PublicVehicleDetail() {
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
   const [activePhoto, setActivePhoto] = useState(0)
+  const [isWishlisted, setIsWishlisted] = useState(false)
+  const [alreadyRequestedVisit, setAlreadyRequestedVisit] = useState(false)
+  const [visitModalOpen, setVisitModalOpen] = useState(false)
+  const [visitPreferredDate, setVisitPreferredDate] = useState('')
+  const [visitPreferredTime, setVisitPreferredTime] = useState('')
+  const [visitMessage, setVisitMessage] = useState('')
+  const [bookingVisit, setBookingVisit] = useState(false)
+  const [visitError, setVisitError] = useState('')
   const thumbScrollRef = useRef(null)
   const featuresScrollRef = useRef(null)
+
+  useEffect(() => {
+    if (!isCustomerAuthenticated() || !id) return
+    fetchWishlist()
+      .then((data) => setIsWishlisted((Array.isArray(data) ? data : []).some((v) => v.id === id)))
+      .catch(() => {})
+    fetchMyVisitRequests()
+      .then((data) => setAlreadyRequestedVisit((Array.isArray(data) ? data : []).some((r) => r.vehicle === id)))
+      .catch(() => {})
+  }, [id])
+
+  const handleToggleWishlist = () => {
+    if (!isCustomerAuthenticated()) {
+      navigate('/portfolio/login')
+      return
+    }
+    const next = !isWishlisted
+    setIsWishlisted(next)
+    const action = next ? addToWishlist(id) : removeFromWishlist(id)
+    action.catch(() => setIsWishlisted(!next))
+  }
+
+  const handleOpenVisitModal = () => {
+    if (!isCustomerAuthenticated()) {
+      navigate('/portfolio/login')
+      return
+    }
+    setVisitError('')
+    setVisitModalOpen(true)
+  }
+
+  const handleSubmitVisit = async (e) => {
+    e.preventDefault()
+    setVisitError('')
+    setBookingVisit(true)
+    try {
+      await bookVisit(id, { preferredDate: visitPreferredDate, preferredTime: visitPreferredTime, message: visitMessage })
+      setAlreadyRequestedVisit(true)
+      setVisitModalOpen(false)
+    } catch (err) {
+      setVisitError(err.message || 'Could not book a visit. Please try again.')
+    } finally {
+      setBookingVisit(false)
+    }
+  }
 
   const scrollThumbs = (dir) => thumbScrollRef.current?.scrollBy({ left: dir * 300, behavior: 'smooth' })
   const scrollFeatures = (dir) => featuresScrollRef.current?.scrollBy({ left: dir * 220, behavior: 'smooth' })
@@ -139,6 +212,7 @@ export default function PublicVehicleDetail() {
               <Link to="/portfolio/services" className="transition hover:text-slate-900">Services</Link>
             ) : null}
             <Link to="/portfolio/contact" className="transition hover:text-slate-900">Contact</Link>
+            <AccountNav />
           </nav>
         </div>
       </header>
@@ -325,8 +399,25 @@ export default function PublicVehicleDetail() {
                 features on the left keep scrolling underneath it. */}
             <div className="min-w-0 lg:sticky lg:top-[100px] lg:w-[380px] lg:max-h-[calc(100vh-120px)] lg:self-start lg:overflow-y-auto">
               <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm shadow-slate-200/70">
-                <p className="text-sm font-semibold text-slate-400">{vehicle.brand_name}</p>
-                <h1 className="text-2xl font-extrabold text-slate-900">{vehicle.year} {vehicle.vehicle_model_name}</h1>
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold text-slate-400">{vehicle.brand_name}</p>
+                    <h1 className="text-2xl font-extrabold text-slate-900">{vehicle.year} {vehicle.vehicle_model_name}</h1>
+                    {vehicle.status === 'booked' ? (
+                      <span className="mt-2 inline-flex items-center rounded-full bg-amber-100 px-3 py-1 text-xs font-bold uppercase tracking-wide text-amber-700">
+                        Booked
+                      </span>
+                    ) : null}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleToggleWishlist}
+                    aria-label={isWishlisted ? 'Remove from wishlist' : 'Add to wishlist'}
+                    className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-slate-100 transition hover:bg-slate-200 ${isWishlisted ? 'text-rose-500' : 'text-slate-400'}`}
+                  >
+                    <Heart size={18} fill={isWishlisted ? 'currentColor' : 'none'} />
+                  </button>
+                </div>
                 <p className="mt-1 text-sm text-slate-500">
                   {Number(vehicle.mileage_km || 0).toLocaleString('en-IN')} km · {vehicle.fuel_type_name} · <span className="capitalize">{vehicle.transmission}</span>
                 </p>
@@ -368,13 +459,32 @@ export default function PublicVehicleDetail() {
                   </div>
                 </div>
 
-                <Link
-                  to="/portfolio/contact"
-                  className="mt-6 flex w-full items-center justify-center gap-2 rounded-full py-3 text-sm font-bold text-white transition hover:opacity-90"
-                  style={{ backgroundColor: ACCENT, boxShadow: BTN_SHADOW }}
-                >
-                  Contact About This Car
-                </Link>
+                {vehicle.status === 'booked' ? (
+                  <p className="mt-6 text-xs text-slate-500">
+                    This vehicle is currently booked by another customer. You can still request a visit in case it becomes available again.
+                  </p>
+                ) : null}
+
+                {alreadyRequestedVisit ? (
+                  <button
+                    type="button"
+                    disabled
+                    className="mt-3 flex w-full cursor-not-allowed items-center justify-center gap-2 rounded-full bg-slate-100 py-3 text-sm font-bold text-slate-400"
+                  >
+                    <CheckCircle2 size={16} />
+                    Visit Requested
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handleOpenVisitModal}
+                    className={`${vehicle.status === 'booked' ? 'mt-3' : 'mt-6'} flex w-full items-center justify-center gap-2 rounded-full py-3 text-sm font-bold text-white transition hover:opacity-90`}
+                    style={{ backgroundColor: ACCENT, boxShadow: BTN_SHADOW }}
+                  >
+                    <Calendar size={16} />
+                    Book a Visit
+                  </button>
+                )}
 
                 <div className="mt-5 flex items-center gap-2 text-xs text-slate-400">
                   <ShieldCheck size={14} />
@@ -418,6 +528,77 @@ export default function PublicVehicleDetail() {
           © {new Date().getFullYear()} {tenantName || 'Showroom'}. All rights reserved.
         </div>
       </footer>
+
+      {visitModalOpen ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 px-4">
+          <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl">
+            <div className="flex items-start justify-between">
+              <h2 className="text-lg font-bold text-slate-900">Book a Visit</h2>
+              <button
+                type="button"
+                onClick={() => setVisitModalOpen(false)}
+                aria-label="Close"
+                className="text-slate-400 transition hover:text-slate-700"
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <p className="mt-1 text-sm text-slate-500">
+              Let us know when you'd like to visit — we'll get in touch to confirm.
+            </p>
+
+            <form className="mt-5 space-y-4" onSubmit={handleSubmitVisit} noValidate>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-bold uppercase tracking-wide text-slate-400" htmlFor="preferredDate">Preferred Date (optional)</label>
+                  <input
+                    id="preferredDate"
+                    type="date"
+                    min={todayLocalDateString()}
+                    value={visitPreferredDate}
+                    onChange={(e) => setVisitPreferredDate(e.target.value)}
+                    className="mt-2 block w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-900 outline-none focus:border-slate-300"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-bold uppercase tracking-wide text-slate-400" htmlFor="preferredTime">Preferred Time (optional)</label>
+                  <input
+                    id="preferredTime"
+                    type="time"
+                    value={visitPreferredTime}
+                    onChange={(e) => setVisitPreferredTime(e.target.value)}
+                    className="mt-2 block w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-900 outline-none focus:border-slate-300"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="text-xs font-bold uppercase tracking-wide text-slate-400" htmlFor="visitMessage">Message (optional)</label>
+                <textarea
+                  id="visitMessage"
+                  rows={3}
+                  value={visitMessage}
+                  onChange={(e) => setVisitMessage(e.target.value)}
+                  placeholder="e.g. Available in the evenings"
+                  className="mt-2 block w-full resize-none rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:border-slate-300"
+                />
+              </div>
+
+              {visitError ? (
+                <div className="rounded-lg border border-rose-300 bg-rose-50 px-3 py-2 text-sm text-rose-700">{visitError}</div>
+              ) : null}
+
+              <button
+                type="submit"
+                disabled={bookingVisit}
+                className="flex w-full items-center justify-center rounded-full py-2.5 text-sm font-bold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+                style={{ backgroundColor: ACCENT, boxShadow: BTN_SHADOW }}
+              >
+                {bookingVisit ? 'Submitting...' : 'Submit Request'}
+              </button>
+            </form>
+          </div>
+        </div>
+      ) : null}
     </div>
   )
 }

@@ -20,11 +20,17 @@ import AdminUsers from './pages/AdminUsers'
 import AdminPortfolio from './pages/AdminPortfolio'
 import AdminInventoryVehicles from './pages/AdminInventoryVehicles'
 import AdminInventoryVehicleForm from './pages/AdminInventoryVehicleForm'
+import AdminVehicleDetail from './pages/AdminVehicleDetail'
+import AdminVisitRequests from './pages/AdminVisitRequests'
 import PublicHome from './pages/PublicHome'
 import PublicInventoryListing from './pages/PublicInventoryListing'
 import PublicServicesListing from './pages/PublicServicesListing'
 import PublicVehicleDetail from './pages/PublicVehicleDetail'
 import PublicContact from './pages/PublicContact'
+import PublicCustomerLogin from './pages/PublicCustomerLogin'
+import PublicCustomerSignup from './pages/PublicCustomerSignup'
+import PublicCustomerAccount from './pages/PublicCustomerAccount'
+import PublicCustomerWishlist from './pages/PublicCustomerWishlist'
 import { isAuthenticated } from './utils/apiClient'
 
 function RequireAuth() {
@@ -43,6 +49,10 @@ export default function App() {
       <Route path="/portfolio/inventory/:id" element={<PublicVehicleDetail />} />
       <Route path="/portfolio/services" element={<PublicServicesListing />} />
       <Route path="/portfolio/contact" element={<PublicContact />} />
+      <Route path="/portfolio/login" element={<PublicCustomerLogin />} />
+      <Route path="/portfolio/signup" element={<PublicCustomerSignup />} />
+      <Route path="/portfolio/account" element={<PublicCustomerAccount />} />
+      <Route path="/portfolio/wishlist" element={<PublicCustomerWishlist />} />
       <Route element={<RequireAuth />}>
         <Route path="/admin/insights" element={<AdminInsights />} />
         <Route path="/admin/users" element={<AdminUsers />} />
@@ -50,6 +60,8 @@ export default function App() {
         <Route path="/admin/portfolio/inventory" element={<AdminInventoryVehicles />} />
         <Route path="/admin/portfolio/inventory/new" element={<AdminInventoryVehicleForm />} />
         <Route path="/admin/portfolio/inventory/:id/edit" element={<AdminInventoryVehicleForm />} />
+        <Route path="/admin/portfolio/inventory/:id" element={<AdminVehicleDetail />} />
+        <Route path="/admin/portfolio/visit-requests" element={<AdminVisitRequests />} />
         <Route path="/admin/dashboard" element={<AdminDashboard />} />
         <Route path="/admin/customers" element={<AdminCustomers />} />
         <Route path="/admin/service-vehicles" element={<AdminServiceVehicles />} />

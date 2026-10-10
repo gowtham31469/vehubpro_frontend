@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
-import { Car, Check, ChevronDown, Cog, Fuel, Gauge, Search, SlidersHorizontal, X } from 'lucide-react'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { Car, Check, ChevronDown, Cog, Fuel, Gauge, Heart, Search, SlidersHorizontal, X } from 'lucide-react'
 import { useTenantBranding } from '../context/TenantBrandingContext.jsx'
 import { fetchPublicInventoryVehicles } from '../utils/publicPortfolio'
+import AccountNav from '../components/public/AccountNav.jsx'
+import { addToWishlist, fetchWishlist, isCustomerAuthenticated, removeFromWishlist } from '../utils/customerAuth'
 
 // Fixed portfolio theme — same palette as PublicPortfolio.jsx/PublicVehicleDetail.jsx/
 // PublicContact.jsx, deliberately NOT the tenant's dynamic brand color.
@@ -231,6 +233,7 @@ function ColorSwatchGroup({ options, selected, onToggle, accentColor }) {
 
 export default function PublicInventoryListing() {
   const { branding, brandingLogoUrl, tenantName, subdomain, tenantError } = useTenantBranding()
+  const navigate = useNavigate()
 
   const [searchParams] = useSearchParams()
 
@@ -243,6 +246,39 @@ export default function PublicInventoryListing() {
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
   const [brandSearch, setBrandSearch] = useState('')
   const [expandedBrands, setExpandedBrands] = useState(() => new Set())
+
+  const [wishlistIds, setWishlistIds] = useState(() => new Set())
+
+  useEffect(() => {
+    if (!isCustomerAuthenticated()) return
+    fetchWishlist()
+      .then((data) => setWishlistIds(new Set((Array.isArray(data) ? data : []).map((v) => v.id))))
+      .catch(() => {})
+  }, [])
+
+  const handleToggleWishlist = (vehicleId) => {
+    if (!isCustomerAuthenticated()) {
+      navigate('/portfolio/login')
+      return
+    }
+    const isWishlisted = wishlistIds.has(vehicleId)
+    setWishlistIds((prev) => {
+      const next = new Set(prev)
+      if (isWishlisted) next.delete(vehicleId)
+      else next.add(vehicleId)
+      return next
+    })
+    const action = isWishlisted ? removeFromWishlist(vehicleId) : addToWishlist(vehicleId)
+    action.catch(() => {
+      // Revert on failure.
+      setWishlistIds((prev) => {
+        const next = new Set(prev)
+        if (isWishlisted) next.add(vehicleId)
+        else next.delete(vehicleId)
+        return next
+      })
+    })
+  }
 
   useEffect(() => {
     if (!subdomain) {
@@ -437,6 +473,7 @@ export default function PublicInventoryListing() {
               <Link to="/portfolio/services" className="transition hover:text-slate-900">Services</Link>
             ) : null}
             <Link to="/portfolio/contact" className="transition hover:text-slate-900">Contact</Link>
+            <AccountNav />
           </nav>
         </div>
       </header>
@@ -680,10 +717,23 @@ export default function PublicInventoryListing() {
                             <Car size={36} className="text-slate-300" />
                           </div>
                         )}
-                        {isNewListing(v.created_at) ? (
+                        {isNewListing(v.created_at) && v.status !== 'booked' ? (
                           <span className="absolute right-2 top-2 rounded-full px-2 py-0.5 text-[11px] font-bold text-white shadow" style={{ backgroundColor: ACCENT }}>
                             New
                           </span>
+                        ) : null}
+                        <button
+                          type="button"
+                          onClick={() => handleToggleWishlist(v.id)}
+                          aria-label={wishlistIds.has(v.id) ? 'Remove from wishlist' : 'Add to wishlist'}
+                          className={`absolute left-2 top-2 flex h-8 w-8 items-center justify-center rounded-full bg-white/90 shadow transition hover:bg-white ${wishlistIds.has(v.id) ? 'text-rose-500' : 'text-slate-400'}`}
+                        >
+                          <Heart size={16} fill={wishlistIds.has(v.id) ? 'currentColor' : 'none'} />
+                        </button>
+                        {v.status === 'booked' ? (
+                          <div className="absolute inset-x-0 bottom-0 bg-amber-500/95 py-1.5 text-center text-xs font-bold uppercase tracking-wider text-white">
+                            Booked
+                          </div>
                         ) : null}
                       </div>
                       <div className="p-4">

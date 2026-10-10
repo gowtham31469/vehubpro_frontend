@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import { Car } from 'lucide-react'
 import { ACCENT, ACCENT_SOFT } from './theme'
+import AccountNav from './AccountNav.jsx'
 
 /**
  * Shared homepage header for PublicPortfolio.jsx / PublicServicesHome.jsx /
@@ -31,6 +32,7 @@ export default function PublicHeader({ brandingLogoUrl, tenantName, showInventor
             <Link to="/portfolio/services" className="transition hover:text-slate-900">Services</Link>
           ) : null}
           <Link to="/portfolio/contact" className="transition hover:text-slate-900">Contact</Link>
+          <AccountNav />
         </nav>
       </div>
     </header>

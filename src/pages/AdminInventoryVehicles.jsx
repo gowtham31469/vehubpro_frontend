@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Car, Pencil, Plus, Search, Trash2, X } from 'lucide-react'
+import { Car, Eye, Pencil, Plus, Search, Trash2, X } from 'lucide-react'
 import AdminShell from '../components/AdminShell'
 import { useToast } from '../context/ToastContext.jsx'
 import { useTenantBranding } from '../context/TenantBrandingContext.jsx'
@@ -10,6 +10,7 @@ const STATUS_STYLES = {
   available: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400',
   booked: 'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400',
   sold: 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400',
+  delivered: 'bg-indigo-50 text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-400',
 }
 
 function fmtMoney(n) {
@@ -177,6 +178,14 @@ export default function AdminInventoryVehicles() {
                           </td>
                           <td className="px-6 py-3">
                             <div className="flex justify-center gap-1 text-slate-500 dark:text-slate-400">
+                              <button
+                                type="button"
+                                className="rounded-lg p-2 hover:bg-slate-100 dark:hover:bg-slate-800"
+                                title="View"
+                                onClick={() => navigate(`/admin/portfolio/inventory/${r.id}`)}
+                              >
+                                <Eye size={16} />
+                              </button>
                               {!showArchived ? (
                                 <button type="button" className="rounded-lg p-2 hover:bg-slate-100 dark:hover:bg-slate-800" title="Edit" onClick={() => navigate(`/admin/portfolio/inventory/${r.id}/edit`)}>
                                   <Pencil size={16} />

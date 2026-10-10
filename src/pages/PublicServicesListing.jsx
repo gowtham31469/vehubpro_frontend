@@ -4,6 +4,7 @@ import { Car, Search, Wrench } from 'lucide-react'
 import { useTenantBranding } from '../context/TenantBrandingContext.jsx'
 import { fetchPublicServiceCategories, fetchPublicServiceItems } from '../utils/publicServices'
 import { ACCENT, ACCENT_SOFT } from '../components/public/theme.js'
+import AccountNav from '../components/public/AccountNav.jsx'
 
 const PAGE_SIZE = 24
 
@@ -108,6 +109,7 @@ export default function PublicServicesListing() {
             ) : null}
             <span className="text-slate-900">Services</span>
             <Link to="/portfolio/contact" className="transition hover:text-slate-900">Contact</Link>
+            <AccountNav />
           </nav>
         </div>
       </header>

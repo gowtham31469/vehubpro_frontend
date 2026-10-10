@@ -249,10 +249,10 @@ export default function AdminServiceVehicleForm() {
     ;(async () => {
       try {
         const [c, vt, ft, b] = await Promise.all([
-          fetchCustomers({ page: 1, pageSize: 100 }),
+          fetchCustomers({ pageSize: 'all' }),
           fetchVehicleTypes(),
           fetchFuelTypes(),
-          fetchBrands({ page: 1, pageSize: 100, isActive: true }),
+          fetchBrands({ pageSize: 'all', isActive: true }),
         ])
         if (cancelled) return
         setCustomers(c.results || [])
@@ -284,7 +284,7 @@ export default function AdminServiceVehicleForm() {
   useEffect(() => {
     if (!form.brand) { setModelsForBrand([]); return }
     let cancelled = false
-    fetchModels({ page: 1, pageSize: 100, brandId: form.brand, isActive: true })
+    fetchModels({ pageSize: 'all', brandId: form.brand, isActive: true })
       .then((data) => { if (!cancelled) setModelsForBrand(data.results || []) })
       .catch(() => { if (!cancelled) setModelsForBrand([]) })
     return () => { cancelled = true }
