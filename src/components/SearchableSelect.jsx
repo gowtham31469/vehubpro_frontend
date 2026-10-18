@@ -4,7 +4,11 @@ import { Check, ChevronDown, Search } from 'lucide-react'
 
 /**
  * Dropdown select with an in-panel search box for filtering long option lists
- * (e.g. states, cities). Options: [{ id, name }].
+ * (e.g. states, cities). Options: [{ id, name }]. Pass `searchable={false}`
+ * for short fixed-choice lists (status/category-style fields) where the
+ * search box would just be clutter — same styled-dropdown look as the
+ * search variant, just without the input. Pass `allowClear={false}` for a
+ * required field where "none" shouldn't be a selectable option.
  */
 export default function SearchableSelect({
   id,
@@ -18,6 +22,8 @@ export default function SearchableSelect({
   loadingLabel = 'Loading…',
   accent,
   accentSoft,
+  searchable = true,
+  allowClear = true,
 }) {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
@@ -42,9 +48,10 @@ export default function SearchableSelect({
   useEffect(() => {
     if (!open) return
     setQuery('')
+    if (!searchable) return
     const raf = requestAnimationFrame(() => searchInputRef.current?.focus())
     return () => cancelAnimationFrame(raf)
-  }, [open])
+  }, [open, searchable])
 
   // Render the dropdown panel in a portal, positioned via getBoundingClientRect —
   // a plain CSS-absolute panel gets clipped/misplaced when this component sits
@@ -100,26 +107,30 @@ export default function SearchableSelect({
               className="fixed z-[9999] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl ring-1 ring-slate-900/5 backdrop-blur-md dark:border-slate-700 dark:bg-slate-800/95"
               style={{ top: `${dropdownPos.top}px`, left: `${dropdownPos.left}px`, width: `${dropdownPos.width}px` }}
             >
-              <div className="flex items-center gap-2 border-b border-slate-100 px-3 py-2 dark:border-slate-700">
-                <Search size={14} className="shrink-0 text-slate-400" />
-                <input
-                  ref={searchInputRef}
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  placeholder={searchPlaceholder}
-                  className="w-full bg-transparent text-sm outline-none placeholder:text-slate-400 dark:text-white dark:placeholder:text-slate-500"
-                />
-              </div>
+              {searchable ? (
+                <div className="flex items-center gap-2 border-b border-slate-100 px-3 py-2 dark:border-slate-700">
+                  <Search size={14} className="shrink-0 text-slate-400" />
+                  <input
+                    ref={searchInputRef}
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    placeholder={searchPlaceholder}
+                    className="w-full bg-transparent text-sm outline-none placeholder:text-slate-400 dark:text-white dark:placeholder:text-slate-500"
+                  />
+                </div>
+              ) : null}
               <div className="max-h-52 overflow-auto">
-                <button
-                  type="button"
-                  onClick={() => { onChange(''); setOpen(false) }}
-                  className={`flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm transition ${!value ? 'font-semibold' : 'text-slate-600 hover:bg-slate-50 dark:text-slate-400 dark:hover:bg-slate-700'}`}
-                  style={!value ? { backgroundColor: accentSoft, color: accent } : undefined}
-                >
-                  {!value ? <Check size={14} /> : <span className="w-[14px]" />}
-                  {placeholder}
-                </button>
+                {allowClear ? (
+                  <button
+                    type="button"
+                    onClick={() => { onChange(''); setOpen(false) }}
+                    className={`flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm transition ${!value ? 'font-semibold' : 'text-slate-600 hover:bg-slate-50 dark:text-slate-400 dark:hover:bg-slate-700'}`}
+                    style={!value ? { backgroundColor: accentSoft, color: accent } : undefined}
+                  >
+                    {!value ? <Check size={14} /> : <span className="w-[14px]" />}
+                    {placeholder}
+                  </button>
+                ) : null}
                 {filtered.length === 0 ? (
                   <p className="px-3 py-3 text-center text-sm text-slate-400">No matches found.</p>
                 ) : (

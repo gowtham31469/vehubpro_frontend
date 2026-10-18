@@ -2,21 +2,23 @@ import { useEffect, useState } from 'react'
 import { Plus } from 'lucide-react'
 import { useToast } from '../../context/ToastContext.jsx'
 import { useTenantBranding } from '../../context/TenantBrandingContext.jsx'
+import CustomerPicker from '../CustomerPicker'
+import SearchableSelect from '../SearchableSelect'
 import { getVehicleAcquisition, saveVehicleAcquisition } from '../../utils/dealerAcquisitions'
 import { addOwnershipRecord, fetchOwnershipHistory } from '../../utils/dealerOwnership'
 import AddOwnershipRecordModal from './AddOwnershipRecordModal'
 
 const ACQUISITION_METHODS = [
-  { value: 'trade_in', label: 'Trade-In' },
-  { value: 'auction', label: 'Auction' },
-  { value: 'direct_purchase', label: 'Direct Purchase' },
-  { value: 'other', label: 'Other' },
+  { id: 'trade_in', name: 'Trade-In' },
+  { id: 'auction', name: 'Auction' },
+  { id: 'direct_purchase', name: 'Direct Purchase' },
+  { id: 'other', name: 'Other' },
 ]
 
 const COMMISSION_TYPES = [
-  { value: 'fixed', label: 'Fixed Amount' },
-  { value: 'percentage', label: 'Percentage' },
-  { value: 'price_difference', label: 'Price Difference' },
+  { id: 'fixed', name: 'Fixed Amount' },
+  { id: 'percentage', name: 'Percentage' },
+  { id: 'price_difference', name: 'Price Difference' },
 ]
 
 const inputCls = 'w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none transition focus:border-slate-400 dark:border-slate-800 dark:bg-slate-950/50 dark:text-slate-100'
@@ -128,6 +130,14 @@ export default function VehicleAcquisitionTab({ vehicle }) {
           {isConsignment ? (
             <>
               <div className="sm:col-span-2">
+                <CustomerPicker
+                  label="Owner (Client)"
+                  required
+                  value={form.owner_customer}
+                  onChange={(v) => setForm((p) => ({ ...p, owner_customer: v }))}
+                />
+              </div>
+              <div className="sm:col-span-2">
                 <label className={labelCls}>Owner Expected Price *</label>
                 <input type="number" min="0" step="0.01" value={form.owner_expected_price} onChange={(e) => setForm((p) => ({ ...p, owner_expected_price: e.target.value }))} className={inputCls} required />
               </div>
@@ -137,9 +147,12 @@ export default function VehicleAcquisitionTab({ vehicle }) {
               </div>
               <div>
                 <label className={labelCls}>Commission Type *</label>
-                <select value={form.commission_type} onChange={(e) => setForm((p) => ({ ...p, commission_type: e.target.value }))} className={inputCls} required>
-                  {COMMISSION_TYPES.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-                </select>
+                <SearchableSelect
+                  searchable={false} allowClear={false}
+                  value={form.commission_type} options={COMMISSION_TYPES}
+                  onChange={(v) => setForm((p) => ({ ...p, commission_type: v }))}
+                  accent={theme.accent} accentSoft={theme.accentSoft}
+                />
               </div>
               <div>
                 <label className={labelCls}>Commission Value *</label>
@@ -166,13 +179,23 @@ export default function VehicleAcquisitionTab({ vehicle }) {
               </div>
               <div>
                 <label className={labelCls}>Acquisition Method *</label>
-                <select value={form.acquisition_method} onChange={(e) => setForm((p) => ({ ...p, acquisition_method: e.target.value }))} className={inputCls} required>
-                  {ACQUISITION_METHODS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-                </select>
+                <SearchableSelect
+                  searchable={false} allowClear={false}
+                  value={form.acquisition_method} options={ACQUISITION_METHODS}
+                  onChange={(v) => setForm((p) => ({ ...p, acquisition_method: v }))}
+                  accent={theme.accent} accentSoft={theme.accentSoft}
+                />
+              </div>
+              <div className="sm:col-span-2">
+                <CustomerPicker
+                  label="Seller (if an existing customer)"
+                  value={form.seller_customer}
+                  onChange={(v) => setForm((p) => ({ ...p, seller_customer: v }))}
+                />
               </div>
               <div>
                 <label className={labelCls}>Seller Name</label>
-                <input value={form.seller_name} onChange={(e) => setForm((p) => ({ ...p, seller_name: e.target.value }))} className={inputCls} />
+                <input value={form.seller_name} onChange={(e) => setForm((p) => ({ ...p, seller_name: e.target.value }))} className={inputCls} placeholder="If not an existing customer" />
               </div>
               <div>
                 <label className={labelCls}>Seller Phone</label>

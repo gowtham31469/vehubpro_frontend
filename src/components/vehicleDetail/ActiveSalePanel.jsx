@@ -31,7 +31,7 @@ export default function ActiveSalePanel({ vehicle, sale, onChanged, showToast })
 
       <DeliverySubpanel sale={sale} onChanged={onChanged} showToast={showToast} />
       {isConsignment ? <SettlementSubpanel sale={sale} onChanged={onChanged} showToast={showToast} /> : null}
-      <InvoiceSubpanel sale={sale} showToast={showToast} />
+      <InvoiceSubpanel sale={sale} vehicle={vehicle} showToast={showToast} />
 
       {cancelOpen ? (
         <ActionReasonModal

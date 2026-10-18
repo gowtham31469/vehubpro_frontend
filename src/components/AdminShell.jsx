@@ -1,7 +1,7 @@
 import {
   Briefcase, Car, ChevronDown, ClipboardList, FileText, LayoutGrid, LogOut,
-  Monitor, Moon, PanelLeftClose, PanelLeftOpen, ReceiptText,
-  Settings2, SlidersHorizontal, Sun, Users,
+  Menu, Monitor, Moon, PanelLeftClose, PanelLeftOpen, ReceiptText,
+  Settings2, SlidersHorizontal, Sun, Users, X,
 } from 'lucide-react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import ReactDOM from 'react-dom'
@@ -98,6 +98,8 @@ const SUBMODULE_ROUTE_MAP = {
   'inventory-vehicles':  '/admin/portfolio/inventory',
   'visit_requests':      '/admin/portfolio/visit-requests',
   'visit-requests':      '/admin/portfolio/visit-requests',
+  'portfolio_reports':   '/admin/portfolio/reports',
+  'portfolio-reports':   '/admin/portfolio/reports',
   // Vehicle Work & Expenses / Sales, Booking & Delivery are tabs on the
   // Inventory Vehicles detail page, not standalone list pages — both
   // resolve to the same inventory list as their nav entry point.
@@ -369,11 +371,13 @@ function NavItem({ module, accent, collapsed }) {
 export default function AdminShell({ children }) {
   const { theme, themeMode, setThemeMode, brandingLogoUrl, tenantName } = useTenantBranding()
   const navigate = useNavigate()
+  const { pathname } = useLocation()
   const [profileOpen, setProfileOpen] = useState(false)
   const [profilePos, setProfilePos] = useState({ top: 0, right: 0 })
   const [collapsed, setCollapsed] = useState(
     () => localStorage.getItem(SIDEBAR_KEY) === '1'
   )
+  const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const [navModules, setNavModules] = useState(() => getCachedNav() || FALLBACK_NAV)
   const profileRef = useRef(null)
   const profileButtonRef = useRef(null)
@@ -386,6 +390,13 @@ export default function AdminShell({ children }) {
       return next
     })
   }
+
+  // Below `lg` the sidebar is a slide-in drawer instead of a persistent
+  // column — close it automatically whenever the route changes, so tapping
+  // a nav link doesn't leave the drawer covering the new page.
+  useEffect(() => {
+    setMobileNavOpen(false)
+  }, [pathname])
 
   useEffect(() => {
     // AdminShell remounts on every sidebar navigation (each admin page renders
@@ -500,19 +511,83 @@ export default function AdminShell({ children }) {
         </div>
       </aside>
 
+      {/* ── Mobile nav drawer (below `lg`, where the persistent sidebar above
+           is hidden entirely) ───────────────────────────────────────────── */}
+      {mobileNavOpen ? (
+        <div className="fixed inset-0 z-[9998] lg:hidden">
+          <div
+            className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
+            onClick={() => setMobileNavOpen(false)}
+          />
+          <aside className="absolute inset-y-0 left-0 flex w-[280px] max-w-[85vw] flex-col border-r border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-slate-950">
+            <div className="flex h-20 items-center justify-between border-b border-slate-100 px-4 dark:border-slate-800">
+              <img
+                src={brandingLogoUrl || '/logo.png'}
+                alt={tenantName || 'VeHubPro'}
+                className="h-14 object-contain"
+              />
+              <button
+                type="button"
+                onClick={() => setMobileNavOpen(false)}
+                aria-label="Close menu"
+                className="rounded-xl p-2 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-6">
+              {navModules.map((module) => (
+                <NavItem key={module.key} module={module} accent={theme.accent} collapsed={false} />
+              ))}
+            </nav>
+            {/* Theme toggle lives in the header on larger screens (sm:flex) —
+                surfaced here too since that header control is hidden below sm. */}
+            <div className="flex items-center justify-center gap-1 border-t border-slate-100 p-3 dark:border-slate-800 sm:hidden">
+              {[
+                { mode: 'light', Icon: Sun, label: 'Light' },
+                { mode: 'system', Icon: Monitor, label: 'System' },
+                { mode: 'dark', Icon: Moon, label: 'Dark' },
+              ].map(({ mode, Icon, label }) => (
+                <button
+                  key={mode}
+                  type="button"
+                  onClick={() => setThemeMode(mode)}
+                  className={`flex flex-1 items-center justify-center gap-1.5 rounded-xl py-2.5 text-xs font-semibold transition-all ${
+                    themeMode === mode ? 'bg-slate-100 text-blue-600 dark:bg-slate-800' : 'text-slate-500 dark:text-slate-400'
+                  }`}
+                >
+                  <Icon size={15} /> {label}
+                </button>
+              ))}
+            </div>
+          </aside>
+        </div>
+      ) : null}
+
       {/* ── Main container ───────────────────────────────────────────────────── */}
       <div className="flex flex-1 flex-col overflow-hidden">
 
         {/* Header */}
-        <header className="flex h-20 shrink-0 items-center justify-between border-b border-slate-200 dark:border-slate-800/60 bg-white/80 dark:bg-[#020617]/80 px-8 backdrop-blur-xl transition-colors">
-          <h2 className="text-lg font-bold text-slate-800 dark:text-slate-100">
-            {tenantName ? `${tenantName} — Staff Portal` : 'VeHubPro Staff Portal'}
-          </h2>
+        <header className="flex h-16 shrink-0 items-center justify-between gap-2 border-b border-slate-200 dark:border-slate-800/60 bg-white/80 dark:bg-[#020617]/80 px-3 backdrop-blur-xl transition-colors sm:px-6 lg:h-20 lg:px-8">
+          <div className="flex min-w-0 items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setMobileNavOpen(true)}
+              aria-label="Open menu"
+              className="shrink-0 rounded-xl p-2 text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800 lg:hidden"
+            >
+              <Menu size={22} />
+            </button>
+            <h2 className="truncate text-sm font-bold text-slate-800 dark:text-slate-100 sm:text-base lg:text-lg">
+              <span className="hidden sm:inline">{tenantName ? `${tenantName} — Staff Portal` : 'VeHubPro Staff Portal'}</span>
+              <span className="sm:hidden">{tenantName || 'VeHubPro'}</span>
+            </h2>
+          </div>
 
-          <div className="flex items-center gap-6">
+          <div className="flex items-center gap-1.5 sm:gap-3 lg:gap-6">
 
             {/* Theme toggle */}
-            <div className="flex items-center rounded-full bg-slate-100 dark:bg-slate-800 p-1 shadow-inner">
+            <div className="hidden items-center rounded-full bg-slate-100 dark:bg-slate-800 p-1 shadow-inner sm:flex">
               <button
                 onClick={() => setThemeMode('light')}
                 className={`flex items-center justify-center rounded-full p-2 transition-all ${themeMode === 'light' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400'}`}
@@ -539,18 +614,18 @@ export default function AdminShell({ children }) {
             <button
               ref={profileButtonRef}
               onClick={() => setProfileOpen(!profileOpen)}
-              className="flex items-center gap-2 rounded-full border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 py-1.5 pl-1.5 pr-4 transition-all hover:bg-slate-100 dark:hover:bg-slate-800"
+              className="flex items-center gap-2 rounded-full border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 py-1.5 pl-1.5 pr-1.5 transition-all hover:bg-slate-100 dark:hover:bg-slate-800 sm:pr-4"
             >
               <div
-                className="flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold text-white shadow-sm"
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white shadow-sm"
                 style={{ backgroundColor: theme.accent }}
               >
                 {user?.full_name ? user.full_name[0].toUpperCase() : 'A'}
               </div>
-              <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+              <span className="hidden text-sm font-semibold text-slate-700 dark:text-slate-200 sm:inline">
                 {user?.full_name || 'Account'}
               </span>
-              <ChevronDown size={14} className={`text-slate-400 transition-transform ${profileOpen ? 'rotate-180' : ''}`} />
+              <ChevronDown size={14} className={`hidden text-slate-400 transition-transform sm:inline ${profileOpen ? 'rotate-180' : ''}`} />
             </button>
 
             {profileOpen && ReactDOM.createPortal(

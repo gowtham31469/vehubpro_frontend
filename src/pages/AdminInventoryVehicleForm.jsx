@@ -42,6 +42,7 @@ const COLOR_OPTIONS = [
 
 function emptyForm(y0) {
   return {
+    inventory_type: 'owned',
     vehicle_type: '',
     brand: '',
     vehicle_model: '',
@@ -64,6 +65,7 @@ function emptyForm(y0) {
 
 function vehicleToForm(v, y0) {
   return {
+    inventory_type: v.inventory_type || 'owned',
     vehicle_type: v.vehicle_type || '',
     brand: v.brand || '',
     vehicle_model: v.vehicle_model || '',
@@ -313,6 +315,7 @@ export default function AdminInventoryVehicleForm() {
     }
 
     const payload = {
+      inventory_type: form.inventory_type,
       vehicle_type: form.vehicle_type,
       brand: form.brand,
       vehicle_model: form.vehicle_model,
@@ -389,6 +392,39 @@ export default function AdminInventoryVehicleForm() {
         ) : null}
 
         <form onSubmit={handleSave} className="space-y-5">
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800/60 dark:bg-slate-900/40 md:p-6">
+            <label className={labelCls}>Listing Type</label>
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              {[
+                { id: 'owned', name: 'Owned Stock', desc: 'You bought this vehicle outright — purchase price & work expenses feed your own profit.' },
+                { id: 'customer_consignment', name: 'Customer Consignment', desc: "A client's vehicle, sold on their behalf — you earn a commission instead of a margin." },
+              ].map((opt) => {
+                const active = form.inventory_type === opt.id
+                return (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    onClick={() => setForm((p) => ({ ...p, inventory_type: opt.id }))}
+                    className="rounded-xl border px-4 py-3 text-left transition"
+                    style={active ? { borderColor: theme.accent, backgroundColor: theme.accentSoft } : undefined}
+                  >
+                    <span className="block text-sm font-bold text-slate-900 dark:text-white">{opt.name}</span>
+                    <span className="mt-0.5 block text-xs text-slate-500 dark:text-slate-400">{opt.desc}</span>
+                  </button>
+                )
+              })}
+            </div>
+            {isEdit ? (
+              <p className="mt-3 text-xs text-slate-400 dark:text-slate-500">
+                Changing this after acquisition details are already filled in can leave the Acquisition tab's fields mismatched — check that tab after switching.
+              </p>
+            ) : (
+              <p className="mt-3 text-xs text-slate-400 dark:text-slate-500">
+                Sets which fields you'll fill in next on the Acquisition tab (purchase price vs. owner/commission details). You can still change it later.
+              </p>
+            )}
+          </div>
+
           <SectionCard step={1} title="Basic Information">
             <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
               <div>

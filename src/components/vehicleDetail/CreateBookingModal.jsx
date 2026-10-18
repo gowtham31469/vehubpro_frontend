@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { X } from 'lucide-react'
 import { useTenantBranding } from '../../context/TenantBrandingContext.jsx'
 import CustomerPicker from '../CustomerPicker'
+import SearchableSelect from '../SearchableSelect'
 
 function todayLocalDateString() {
   const d = new Date()
@@ -50,10 +51,13 @@ export default function CreateBookingModal({ reservations = [], onClose, onSubmi
           {reservations.length > 0 ? (
             <div>
               <label className={labelCls}>Link Reservation (optional)</label>
-              <select value={form.reservation} onChange={(e) => setForm((p) => ({ ...p, reservation: e.target.value }))} className={inputCls}>
-                <option value="">None</option>
-                {reservations.map((r) => <option key={r.id} value={r.id}>{r.customer_name} — {r.status}</option>)}
-              </select>
+              <SearchableSelect
+                searchable={false} placeholder="None"
+                value={form.reservation}
+                options={reservations.map((r) => ({ id: r.id, name: `${r.customer_name} — ${r.status}` }))}
+                onChange={(v) => setForm((p) => ({ ...p, reservation: v }))}
+                accent={theme.accent} accentSoft={theme.accentSoft}
+              />
               <p className="mt-1 text-xs text-slate-400">
                 If this booking replaces a reservation deposit, enter the full amount collected so far as the Booking Amount below — it carries forward and reduces what's left to collect on the invoice.
               </p>

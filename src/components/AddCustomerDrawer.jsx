@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import ReactDOM from 'react-dom'
 import { UserPlus, X } from 'lucide-react'
 import { useTenantBranding } from '../context/TenantBrandingContext.jsx'
 import { createCustomer, fetchCities, fetchStates } from '../utils/customers'
@@ -99,6 +100,15 @@ export default function AddCustomerDrawer({ open, onClose, onCustomerCreated }) 
 
   const handleSubmit = async (e) => {
     e.preventDefault()
+    // React's synthetic events bubble through the COMPONENT tree, not the
+    // DOM tree — even though this drawer now renders via a portal (outside
+    // any ancestor <form> in the actual DOM), its submit event still
+    // bubbles up to an ancestor <form>'s onSubmit if this drawer was opened
+    // from inside one (e.g. Create Reservation/Booking, Confirm Sale).
+    // Without this, submitting the customer form also fires the ancestor
+    // modal's submit handler with whatever half-filled data it had at that
+    // moment. See https://react.dev/reference/react-dom/createPortal#event-bubbling-through-portals
+    e.stopPropagation()
     setFormError('')
 
     const fullName = normalizeText(form.full_name).trim()
@@ -154,7 +164,14 @@ export default function AddCustomerDrawer({ open, onClose, onCustomerCreated }) 
 
   if (!open) return null
 
-  return (
+  // Rendered via a portal (not inline) — this drawer has its own <form>, and
+  // CustomerPicker can now be used inside OTHER modals that are themselves
+  // wrapped in a <form> (e.g. Create Reservation/Booking, Confirm Sale).
+  // Rendering inline would nest one <form> inside another, which is invalid
+  // HTML — the submit button's click can fall through to a native, unhandled
+  // form submission instead of this component's own submit handler, causing
+  // a full page reload instead of creating the customer.
+  return ReactDOM.createPortal(
     <>
       {/* Backdrop */}
       <div
@@ -393,6 +410,7 @@ export default function AddCustomerDrawer({ open, onClose, onCustomerCreated }) 
           </button>
         </div>
       </div>
-    </>
+    </>,
+    document.body,
   )
 }

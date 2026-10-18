@@ -1,22 +1,23 @@
 import { useState } from 'react'
 import { X } from 'lucide-react'
 import { useTenantBranding } from '../../context/TenantBrandingContext.jsx'
+import SearchableSelect from '../SearchableSelect'
 
 const CATEGORIES = [
   'brake', 'engine', 'transmission', 'suspension', 'electrical', 'ac', 'tyre', 'battery', 'painting',
   'body_repair', 'denting', 'detailing', 'oil_change', 'general_service', 'accessories', 'interior',
   'glass', 'cleaning', 'transport', 'insurance', 'rto', 'documentation', 'other',
-].map((v) => ({ value: v, label: v.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()) }))
+].map((v) => ({ id: v, name: v.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()) }))
 
 const PROVIDER_TYPES = [
   'internal', 'external_garage', 'paint_shop', 'tyre_shop', 'body_shop', 'detailer', 'electrician', 'vendor', 'other',
-].map((v) => ({ value: v, label: v.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()) }))
+].map((v) => ({ id: v, name: v.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()) }))
 
 const STATUSES = [
-  { value: 'planned', label: 'Planned' },
-  { value: 'in_progress', label: 'In Progress' },
-  { value: 'completed', label: 'Completed' },
-  { value: 'cancelled', label: 'Cancelled' },
+  { id: 'planned', name: 'Planned' },
+  { id: 'in_progress', name: 'In Progress' },
+  { id: 'completed', name: 'Completed' },
+  { id: 'cancelled', name: 'Cancelled' },
 ]
 
 const inputCls = 'w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none transition focus:border-slate-400 dark:border-slate-800 dark:bg-slate-950/50 dark:text-slate-100'
@@ -68,9 +69,12 @@ export default function WorkExpenseModal({ expense, onClose, onSubmit }) {
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
               <label className={labelCls}>Category *</label>
-              <select value={form.category} onChange={(e) => setForm((p) => ({ ...p, category: e.target.value }))} className={inputCls} required>
-                {CATEGORIES.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-              </select>
+              <SearchableSelect
+                allowClear={false} searchPlaceholder="Search categories..."
+                value={form.category} options={CATEGORIES}
+                onChange={(v) => setForm((p) => ({ ...p, category: v }))}
+                accent={theme.accent} accentSoft={theme.accentSoft}
+              />
             </div>
             <div>
               <label className={labelCls}>Amount *</label>
@@ -86,9 +90,12 @@ export default function WorkExpenseModal({ expense, onClose, onSubmit }) {
             </div>
             <div>
               <label className={labelCls}>Status *</label>
-              <select value={form.status} onChange={(e) => setForm((p) => ({ ...p, status: e.target.value }))} className={inputCls} required>
-                {STATUSES.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-              </select>
+              <SearchableSelect
+                searchable={false} allowClear={false}
+                value={form.status} options={STATUSES}
+                onChange={(v) => setForm((p) => ({ ...p, status: v }))}
+                accent={theme.accent} accentSoft={theme.accentSoft}
+              />
             </div>
             <div>
               <label className={labelCls}>Provider Name</label>
@@ -96,9 +103,12 @@ export default function WorkExpenseModal({ expense, onClose, onSubmit }) {
             </div>
             <div>
               <label className={labelCls}>Provider Type</label>
-              <select value={form.provider_type} onChange={(e) => setForm((p) => ({ ...p, provider_type: e.target.value }))} className={inputCls}>
-                {PROVIDER_TYPES.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-              </select>
+              <SearchableSelect
+                searchable={false}
+                value={form.provider_type} options={PROVIDER_TYPES}
+                onChange={(v) => setForm((p) => ({ ...p, provider_type: v }))}
+                accent={theme.accent} accentSoft={theme.accentSoft}
+              />
             </div>
             <div>
               <label className={labelCls}>Reference Number</label>

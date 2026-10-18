@@ -18,6 +18,8 @@ import AdminQuotationDetail from './pages/AdminQuotationDetail'
 import AdminInsights from './pages/AdminInsights'
 import AdminUsers from './pages/AdminUsers'
 import AdminPortfolio from './pages/AdminPortfolio'
+import AdminPortfolioReports from './pages/AdminPortfolioReports'
+import AdminVehicleSalesReport from './pages/AdminVehicleSalesReport'
 import AdminInventoryVehicles from './pages/AdminInventoryVehicles'
 import AdminInventoryVehicleForm from './pages/AdminInventoryVehicleForm'
 import AdminVehicleDetail from './pages/AdminVehicleDetail'
@@ -57,6 +59,8 @@ export default function App() {
         <Route path="/admin/insights" element={<AdminInsights />} />
         <Route path="/admin/users" element={<AdminUsers />} />
         <Route path="/admin/portfolio" element={<AdminPortfolio />} />
+        <Route path="/admin/portfolio/reports" element={<AdminPortfolioReports />} />
+        <Route path="/admin/portfolio/reports/sales" element={<AdminVehicleSalesReport />} />
         <Route path="/admin/portfolio/inventory" element={<AdminInventoryVehicles />} />
         <Route path="/admin/portfolio/inventory/new" element={<AdminInventoryVehicleForm />} />
         <Route path="/admin/portfolio/inventory/:id/edit" element={<AdminInventoryVehicleForm />} />

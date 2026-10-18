@@ -1,13 +1,14 @@
 import { useState } from 'react'
 import { X } from 'lucide-react'
 import { useTenantBranding } from '../../context/TenantBrandingContext.jsx'
+import SearchableSelect from '../SearchableSelect'
 
 const PAYMENT_MODES = [
-  { value: 'cash', label: 'Cash' },
-  { value: 'upi', label: 'UPI' },
-  { value: 'card', label: 'Card' },
-  { value: 'bank_transfer', label: 'Bank Transfer' },
-  { value: 'cheque', label: 'Cheque' },
+  { id: 'cash', name: 'Cash' },
+  { id: 'upi', name: 'UPI' },
+  { id: 'card', name: 'Card' },
+  { id: 'bank_transfer', name: 'Bank Transfer' },
+  { id: 'cheque', name: 'Cheque' },
 ]
 
 function fmtMoney(n) {
@@ -52,9 +53,12 @@ export default function RecordSaleInvoicePaymentModal({ invoice, onClose, onSubm
         <form onSubmit={handleSubmit} className="mt-5 space-y-4">
           <div>
             <label className={labelCls}>Payment mode</label>
-            <select value={form.payment_mode} onChange={(e) => setForm((p) => ({ ...p, payment_mode: e.target.value }))} className={inputCls} required>
-              {PAYMENT_MODES.map(({ value, label }) => <option key={value} value={value}>{label}</option>)}
-            </select>
+            <SearchableSelect
+              searchable={false} allowClear={false}
+              value={form.payment_mode} options={PAYMENT_MODES}
+              onChange={(v) => setForm((p) => ({ ...p, payment_mode: v }))}
+              accent={theme.accent} accentSoft={theme.accentSoft}
+            />
           </div>
           <div>
             <label className={labelCls}>Amount (₹)</label>

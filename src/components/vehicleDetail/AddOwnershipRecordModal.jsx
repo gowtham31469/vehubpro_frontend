@@ -2,12 +2,13 @@ import { useState } from 'react'
 import { X } from 'lucide-react'
 import { useTenantBranding } from '../../context/TenantBrandingContext.jsx'
 import CustomerPicker from '../CustomerPicker'
+import SearchableSelect from '../SearchableSelect'
 
 const OWNER_TYPES = [
-  { value: 'previous_owner', label: 'Previous Owner' },
-  { value: 'dealer', label: 'Dealer' },
-  { value: 'consignor', label: 'Consignor' },
-  { value: 'buyer', label: 'Buyer' },
+  { id: 'previous_owner', name: 'Previous Owner' },
+  { id: 'dealer', name: 'Dealer' },
+  { id: 'consignor', name: 'Consignor' },
+  { id: 'buyer', name: 'Buyer' },
 ]
 
 const inputCls = 'w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none transition focus:border-slate-400 dark:border-slate-800 dark:bg-slate-950/50 dark:text-slate-100'
@@ -55,9 +56,12 @@ export default function AddOwnershipRecordModal({ onClose, onSubmit }) {
           <div className="space-y-4">
             <div>
               <label className={labelCls}>Owner Type *</label>
-              <select value={form.owner_type} onChange={(e) => setForm((p) => ({ ...p, owner_type: e.target.value }))} className={inputCls} required>
-                {OWNER_TYPES.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-              </select>
+              <SearchableSelect
+                searchable={false} allowClear={false}
+                value={form.owner_type} options={OWNER_TYPES}
+                onChange={(v) => setForm((p) => ({ ...p, owner_type: v }))}
+                accent={theme.accent} accentSoft={theme.accentSoft}
+              />
             </div>
             <CustomerPicker value={form.owner_customer} onChange={(v) => setForm((p) => ({ ...p, owner_customer: v }))} label="Owner Customer (if applicable)" />
             <div>

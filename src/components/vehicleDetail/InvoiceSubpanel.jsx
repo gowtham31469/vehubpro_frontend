@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Download } from 'lucide-react'
 import { useTenantBranding } from '../../context/TenantBrandingContext.jsx'
 import { createSaleInvoice, generateSaleInvoicePdf, getSaleInvoice, recordInvoicePayment } from '../../utils/dealerInvoices'
-import NotesOnlyActionModal from './NotesOnlyActionModal'
+import GenerateInvoiceModal from './GenerateInvoiceModal'
 import RecordSaleInvoicePaymentModal from './RecordSaleInvoicePaymentModal'
 
 function fmtMoney(n) {
@@ -16,7 +16,7 @@ const PAYMENT_STATUS_STYLES = {
   paid: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300',
 }
 
-export default function InvoiceSubpanel({ sale, showToast }) {
+export default function InvoiceSubpanel({ sale, vehicle, showToast }) {
   const { theme } = useTenantBranding()
   const [invoice, setInvoice] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -105,14 +105,17 @@ export default function InvoiceSubpanel({ sale, showToast }) {
       )}
 
       {createModalOpen ? (
-        <NotesOnlyActionModal
-          title="Generate Invoice"
-          confirmLabel="Generate Invoice"
-          onClose={() => setCreateModalOpen(false)}
-          onSubmit={async (payload) => {
-            await createSaleInvoice(sale.id, payload)
-            showToast('success', 'Invoice generated — use Download Invoice to get the PDF.')
+        <GenerateInvoiceModal
+          sale={sale}
+          vehicle={vehicle}
+          onClose={() => {
+            setCreateModalOpen(false)
             load()
+          }}
+          onGenerate={async (payload) => {
+            const invoice = await createSaleInvoice(sale.id, payload)
+            showToast('success', 'Invoice generated.')
+            return invoice
           }}
         />
       ) : null}

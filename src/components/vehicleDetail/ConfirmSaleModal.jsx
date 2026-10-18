@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { X } from 'lucide-react'
 import { useTenantBranding } from '../../context/TenantBrandingContext.jsx'
 import CustomerPicker from '../CustomerPicker'
+import SearchableSelect from '../SearchableSelect'
 import StaffPicker from '../StaffPicker'
 
 function todayLocalDateString() {
@@ -57,10 +58,13 @@ export default function ConfirmSaleModal({ bookings = [], onClose, onSubmit }) {
           {bookings.length > 0 ? (
             <div>
               <label className={labelCls}>Link Booking (optional)</label>
-              <select value={form.booking} onChange={(e) => setForm((p) => ({ ...p, booking: e.target.value }))} className={inputCls}>
-                <option value="">None</option>
-                {bookings.map((b) => <option key={b.id} value={b.id}>{b.customer_name} — {b.status}</option>)}
-              </select>
+              <SearchableSelect
+                searchable={false} placeholder="None"
+                value={form.booking}
+                options={bookings.map((b) => ({ id: b.id, name: `${b.customer_name} — ${b.status}` }))}
+                onChange={(v) => setForm((p) => ({ ...p, booking: v }))}
+                accent={theme.accent} accentSoft={theme.accentSoft}
+              />
               <p className="mt-1 text-xs text-slate-400">
                 Linking a booking automatically credits its booking amount (which already includes any reservation deposit) toward the invoice once generated.
               </p>

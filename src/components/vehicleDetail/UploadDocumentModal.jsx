@@ -1,11 +1,12 @@
 import { useState } from 'react'
 import { X } from 'lucide-react'
 import { useTenantBranding } from '../../context/TenantBrandingContext.jsx'
+import SearchableSelect from '../SearchableSelect'
 
 const DOCUMENT_TYPES = [
   'rc', 'insurance', 'puc', 'noc', 'purchase_document', 'purchase_invoice',
   'consignment_agreement', 'owner_authorization', 'kyc', 'work_receipt', 'other',
-].map((v) => ({ value: v, label: v.replace(/_/g, ' ').toUpperCase() }))
+].map((v) => ({ id: v, name: v.replace(/_/g, ' ').toUpperCase() }))
 
 const inputCls = 'w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none transition focus:border-slate-400 dark:border-slate-800 dark:bg-slate-950/50 dark:text-slate-100'
 const labelCls = 'mb-1 block text-xs font-semibold text-slate-500 dark:text-slate-400'
@@ -42,9 +43,12 @@ export default function UploadDocumentModal({ onClose, onSubmit }) {
           {error ? <div className="rounded-xl border border-rose-300 bg-rose-50 px-3 py-2 text-sm text-rose-700 dark:border-rose-900/50 dark:bg-rose-900/20 dark:text-rose-400">{error}</div> : null}
           <div>
             <label className={labelCls}>Document Type *</label>
-            <select value={form.document_type} onChange={(e) => setForm((p) => ({ ...p, document_type: e.target.value }))} className={inputCls} required>
-              {DOCUMENT_TYPES.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-            </select>
+            <SearchableSelect
+              searchable={false} allowClear={false}
+              value={form.document_type} options={DOCUMENT_TYPES}
+              onChange={(v) => setForm((p) => ({ ...p, document_type: v }))}
+              accent={theme.accent} accentSoft={theme.accentSoft}
+            />
           </div>
           <div>
             <label className={labelCls}>File *</label>

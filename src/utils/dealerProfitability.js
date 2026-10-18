@@ -9,3 +9,7 @@ async function parseResponse(path, options, fallbackError) {
 export async function fetchVehicleProfitability(vehicleId) {
   return parseResponse(`/api/v1/dealer-sales/vehicles/${vehicleId}/profitability/`, { method: 'GET' }, 'Failed to compute profitability.')
 }
+
+export async function fetchPortfolioProfitabilityInsights() {
+  return parseResponse(`/api/v1/dealer-sales/profitability-insights/`, { method: 'GET' }, 'Failed to load profitability insights.')
+}

@@ -717,7 +717,12 @@ export default function PublicInventoryListing() {
                             <Car size={36} className="text-slate-300" />
                           </div>
                         )}
-                        {isNewListing(v.created_at) && v.status !== 'booked' ? (
+                        {v.status === 'booked' ? (
+                          <span className="absolute right-2 top-2 inline-flex items-center gap-1 rounded-full bg-amber-500 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide text-white shadow">
+                            <span className="h-1.5 w-1.5 rounded-full bg-white" />
+                            Booked
+                          </span>
+                        ) : isNewListing(v.created_at) ? (
                           <span className="absolute right-2 top-2 rounded-full px-2 py-0.5 text-[11px] font-bold text-white shadow" style={{ backgroundColor: ACCENT }}>
                             New
                           </span>
@@ -731,9 +736,7 @@ export default function PublicInventoryListing() {
                           <Heart size={16} fill={wishlistIds.has(v.id) ? 'currentColor' : 'none'} />
                         </button>
                         {v.status === 'booked' ? (
-                          <div className="absolute inset-x-0 bottom-0 bg-amber-500/95 py-1.5 text-center text-xs font-bold uppercase tracking-wider text-white">
-                            Booked
-                          </div>
+                          <div className="absolute inset-0 bg-slate-900/10" />
                         ) : null}
                       </div>
                       <div className="p-4">
