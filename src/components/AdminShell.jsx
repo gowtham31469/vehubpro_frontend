@@ -53,6 +53,10 @@ const SUBMODULE_ROUTE_MAP = {
   'quotation-list':      '/admin/quotations',
   'quotation_list':      '/admin/quotations',
 
+  // Proforma Invoices
+  'proforma_invoices':   '/admin/proforma-invoices',
+  'proforma-invoices':   '/admin/proforma-invoices',
+
   // Service Vehicles
   'service-vehicles':    '/admin/service-vehicles',
   'service_vehicles':    '/admin/service-vehicles',

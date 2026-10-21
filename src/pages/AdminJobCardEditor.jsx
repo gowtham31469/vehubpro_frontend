@@ -24,6 +24,7 @@ import { useToast } from '../context/ToastContext.jsx'
 import { fetchCustomers } from '../utils/customers'
 import { createJobCard, generateJobCardPdf, getJobCard, updateJobCard, patchJobCard } from '../utils/jobCards'
 import { generateInvoiceFromJobCard } from '../utils/invoices'
+import { fetchProformaInvoices, generateProformaInvoiceFromJobCard } from '../utils/proformaInvoices'
 import { fetchServiceItems } from '../utils/services'
 import { fetchServiceVehicles } from '../utils/vehicles'
 
@@ -487,6 +488,74 @@ function GenerateInvoiceModal({ jobCardId, theme, showToast, onClose, onSuccess 
   )
 }
 
+function GenerateProformaInvoiceModal({ jobCardId, theme, showToast, onClose, onSuccess }) {
+  const [invoiceType, setInvoiceType] = useState('gst')
+  const [generating, setGenerating] = useState(false)
+
+  const handleConfirm = async () => {
+    setGenerating(true)
+    try {
+      const proforma = await generateProformaInvoiceFromJobCard(jobCardId, { invoice_type: invoiceType })
+      onSuccess(proforma)
+    } catch (e) {
+      if (e.message === 'SESSION_EXPIRED') { globalThis.location.href = '/admin'; return }
+      showToast('error', e.message || 'Failed to generate proforma invoice.')
+    } finally {
+      setGenerating(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm">
+      <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl dark:border-slate-800 dark:bg-slate-950">
+        <div className="flex items-center justify-between gap-3">
+          <h3 className="text-lg font-bold text-slate-900 dark:text-white">Generate Proforma Invoice</h3>
+          <button type="button" onClick={onClose} aria-label="Close" className="text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200">
+            <X size={18} />
+          </button>
+        </div>
+        <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
+          A preliminary estimate snapshotted from this job card's current line items — not a GST tax invoice.
+          You can share it with the customer, collect an advance against it, and convert it to the real invoice later.
+        </p>
+        <div className="mt-4 space-y-2">
+          {INVOICE_TYPE_OPTIONS.map((opt) => {
+            const selected = invoiceType === opt.value
+            return (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => setInvoiceType(opt.value)}
+                className="w-full rounded-xl border p-3 text-left transition"
+                style={selected ? { borderColor: theme.accent, backgroundColor: theme.accentSoft } : { borderColor: 'rgb(226 232 240)' }}
+              >
+                <p className="text-sm font-semibold" style={{ color: selected ? theme.accent : undefined }}>
+                  <span className={selected ? '' : 'text-slate-800 dark:text-slate-200'}>{opt.label}</span>
+                </p>
+                <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{opt.hint}</p>
+              </button>
+            )
+          })}
+        </div>
+        <div className="mt-5 flex justify-end gap-2">
+          <button type="button" onClick={onClose} disabled={generating} className="rounded-xl px-4 py-2 text-sm font-semibold text-slate-600 disabled:opacity-60 dark:text-slate-400">
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={handleConfirm}
+            disabled={generating}
+            className="inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-60"
+            style={{ backgroundColor: theme.accent }}
+          >
+            {generating ? 'Generating…' : 'Generate Proforma'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function AdminJobCardEditor() {
   const { id: routeId } = useParams()
   const navigate = useNavigate()
@@ -497,6 +566,8 @@ export default function AdminJobCardEditor() {
   const [loading, setLoading] = useState(!isNew)
   const [saving, setSaving] = useState(false)
   const [generateInvoiceOpen, setGenerateInvoiceOpen] = useState(false)
+  const [generateProformaOpen, setGenerateProformaOpen] = useState(false)
+  const [activeProforma, setActiveProforma] = useState(null)
   const [generatingPdf, setGeneratingPdf] = useState(false)
   const [markingDelivered, setMarkingDelivered] = useState(false)
   const [error, setError] = useState('')
@@ -736,6 +807,24 @@ export default function AdminJobCardEditor() {
     return () => {
       cancelled = true
     }
+  }, [isNew, routeId])
+
+  // Whether this job card already has an active (draft/issued/approved)
+  // proforma invoice — if so, "Create Proforma Invoice" is replaced by
+  // "View Proforma" below, since the backend blocks generating a second,
+  // unrelated proforma number while one is still live (use "Create Revision"
+  // on the existing one instead).
+  useEffect(() => {
+    if (isNew) { setActiveProforma(null); return }
+    let cancelled = false
+    fetchProformaInvoices({ jobCardId: routeId, pageSize: 5 })
+      .then((data) => {
+        if (cancelled) return
+        const active = (data.results || []).find((p) => ['draft', 'issued', 'approved'].includes(p.status))
+        setActiveProforma(active || null)
+      })
+      .catch(() => { if (!cancelled) setActiveProforma(null) })
+    return () => { cancelled = true }
   }, [isNew, routeId])
 
   useEffect(() => {
@@ -1101,6 +1190,36 @@ export default function AdminJobCardEditor() {
                     </>
                   )}
                 </button>
+              )}
+
+              {/* ── Create/View proforma invoice (any time before the job is
+                   invoiced/delivered/cancelled — it's a preliminary estimate,
+                   usable much earlier than "Generate invoice" which requires
+                   'completed'). Once one is active (draft/issued/approved),
+                   the backend blocks generating a second, unrelated one —
+                   show "View Proforma" instead, nudging toward "Create
+                   Revision" on the existing one rather than a parallel new
+                   number. ── */}
+              {!isNew && !['invoiced', 'delivered', 'cancelled'].includes(form.status) && (
+                activeProforma ? (
+                  <button
+                    type="button"
+                    onClick={() => navigate(`/admin/proforma-invoices/${activeProforma.id}`)}
+                    className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
+                  >
+                    <FileText size={16} className="text-slate-400" />
+                    View Proforma ({activeProforma.proforma_number})
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setGenerateProformaOpen(true)}
+                    className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
+                  >
+                    <FileText size={16} className="text-slate-400" />
+                    Create Proforma Invoice
+                  </button>
+                )
               )}
 
               {/* ── Generate invoice (only when completed) ── */}
@@ -1870,6 +1989,20 @@ export default function AdminJobCardEditor() {
             setGenerateInvoiceOpen(false)
             showToast('success', `Invoice ${invoice.invoice_number} generated.`)
             navigate(`/admin/invoices/${invoice.id}`)
+          }}
+        />
+      )}
+
+      {generateProformaOpen && (
+        <GenerateProformaInvoiceModal
+          jobCardId={routeId}
+          theme={theme}
+          showToast={showToast}
+          onClose={() => setGenerateProformaOpen(false)}
+          onSuccess={(proforma) => {
+            setGenerateProformaOpen(false)
+            showToast('success', `Proforma invoice ${proforma.proforma_number} generated.`)
+            navigate(`/admin/proforma-invoices/${proforma.id}`)
           }}
         />
       )}
