@@ -57,6 +57,7 @@ function emptyForm(y0) {
     offer_valid_until: '',
     is_featured: false,
     reasons_to_buy: [],
+    description: '',
     insurance_policy_no: '',
     registration_no: '',
     tax_expiration_date: '',
@@ -80,6 +81,7 @@ function vehicleToForm(v, y0) {
     offer_valid_until: v.offer_valid_until || '',
     is_featured: Boolean(v.is_featured),
     reasons_to_buy: Array.isArray(v.reasons_to_buy) ? v.reasons_to_buy : [],
+    description: v.description || '',
     insurance_policy_no: v.insurance_policy_no || '',
     registration_no: v.registration_no || '',
     tax_expiration_date: v.tax_expiration_date || '',
@@ -332,6 +334,7 @@ export default function AdminInventoryVehicleForm() {
       reasons_to_buy: form.reasons_to_buy
         .map((r) => ({ title: (r.title || '').trim(), description: (r.description || '').trim() }))
         .filter((r) => r.title),
+      description: form.description.trim(),
       insurance_policy_no: form.insurance_policy_no.trim(),
       registration_no: form.registration_no.trim(),
       tax_expiration_date: form.tax_expiration_date || null,
@@ -534,6 +537,17 @@ export default function AdminInventoryVehicleForm() {
                   </span>
                 </span>
               </button>
+            </div>
+
+            <div className="mt-4">
+              <label className={labelCls}>Description</label>
+              <textarea
+                rows={4}
+                value={form.description}
+                onChange={(e) => setForm((p) => ({ ...p, description: e.target.value }))}
+                placeholder="Condition, history, or any other details worth mentioning about this vehicle…"
+                className={inputCls}
+              />
             </div>
           </SectionCard>
 

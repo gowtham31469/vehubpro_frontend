@@ -61,3 +61,7 @@ export async function generateJobCardPdf(id) {
     'Failed to generate job card PDF.'
   )
 }
+
+export async function fetchJobCardStatusEvents(id) {
+  return parseResponse(`/api/v1/job-cards/${id}/status-events/`, { method: 'GET' }, 'Failed to load status history.')
+}

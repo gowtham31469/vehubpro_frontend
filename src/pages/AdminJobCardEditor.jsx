@@ -7,11 +7,13 @@ import {
   ChevronDown,
   Download,
   FileText,
+  History,
   Lock,
   Loader2,
   Pencil,
   Phone,
   Plus,
+  Save,
   Search,
   Trash2,
   Truck,
@@ -22,7 +24,7 @@ import AdminShell from '../components/AdminShell'
 import { useTenantBranding } from '../context/TenantBrandingContext.jsx'
 import { useToast } from '../context/ToastContext.jsx'
 import { fetchCustomers } from '../utils/customers'
-import { createJobCard, generateJobCardPdf, getJobCard, updateJobCard, patchJobCard } from '../utils/jobCards'
+import { createJobCard, fetchJobCardStatusEvents, generateJobCardPdf, getJobCard, updateJobCard, patchJobCard } from '../utils/jobCards'
 import { generateInvoiceFromJobCard } from '../utils/invoices'
 import { fetchProformaInvoices, generateProformaInvoiceFromJobCard } from '../utils/proformaInvoices'
 import { fetchServiceItems } from '../utils/services'
@@ -556,6 +558,71 @@ function GenerateProformaInvoiceModal({ jobCardId, theme, showToast, onClose, on
   )
 }
 
+function formatDateTime(iso) {
+  if (!iso) return '—'
+  return new Date(iso).toLocaleString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+}
+
+// ── Status timeline modal ───────────────────────────────────────────────────
+function StatusTimelineModal({ jobCardId, onClose }) {
+  const [events, setEvents] = useState(null)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    fetchJobCardStatusEvents(jobCardId).then(setEvents).catch((e) => setError(e.message))
+  }, [jobCardId])
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm">
+      <div className="w-full max-w-lg rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 p-6 shadow-2xl">
+        <div className="mb-5 flex items-center justify-between">
+          <h3 className="text-lg font-bold text-slate-900 dark:text-white">Status Timeline</h3>
+          <button type="button" onClick={onClose} aria-label="Close" className="text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"><X size={18} /></button>
+        </div>
+        {error ? <p className="text-sm text-rose-600 dark:text-rose-400">{error}</p> : null}
+        {!events ? (
+          <p className="text-sm text-slate-500 dark:text-slate-400">Loading…</p>
+        ) : events.length === 0 ? (
+          <p className="text-sm text-slate-500 dark:text-slate-400">No status changes recorded yet.</p>
+        ) : (
+          <ol className="max-h-96 space-y-0 overflow-y-auto">
+            {[...events].reverse().map((ev, idx, arr) => (
+              <li key={ev.id} className="relative flex gap-3 pb-5 last:pb-0">
+                {idx !== arr.length - 1 && (
+                  <span className="absolute left-[7px] top-4 h-full w-px bg-slate-200 dark:bg-slate-700" aria-hidden />
+                )}
+                <span
+                  className="relative z-10 mt-1.5 h-3.5 w-3.5 shrink-0 rounded-full ring-4 ring-white dark:ring-slate-950"
+                  style={{ backgroundColor: idx === 0 ? '#059669' : '#cbd5e1' }}
+                  aria-hidden
+                />
+                <div className="flex-1">
+                  <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">
+                    {ev.from_status ? (
+                      <>
+                        <span className={`inline-flex rounded-md px-1.5 py-0.5 text-[11px] font-bold uppercase tracking-wide ${statusBadgeClass(ev.from_status)}`}>{statusLabel(ev.from_status)}</span>
+                        <span className="mx-1.5 text-slate-400">→</span>
+                      </>
+                    ) : null}
+                    <span className={`inline-flex rounded-md px-1.5 py-0.5 text-[11px] font-bold uppercase tracking-wide ${statusBadgeClass(ev.to_status)}`}>{statusLabel(ev.to_status)}</span>
+                  </p>
+                  <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">
+                    {formatDateTime(ev.created_at)} · {ev.changed_by_name}
+                  </p>
+                  {ev.note ? <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{ev.note}</p> : null}
+                </div>
+              </li>
+            ))}
+          </ol>
+        )}
+        <button type="button" onClick={onClose} className="mt-5 w-full rounded-lg bg-slate-100 dark:bg-slate-800 px-4 py-2 text-sm font-semibold text-slate-700 dark:text-slate-300 transition hover:bg-slate-200 dark:hover:bg-slate-700">
+          Close
+        </button>
+      </div>
+    </div>
+  )
+}
+
 export default function AdminJobCardEditor() {
   const { id: routeId } = useParams()
   const navigate = useNavigate()
@@ -567,6 +634,7 @@ export default function AdminJobCardEditor() {
   const [saving, setSaving] = useState(false)
   const [generateInvoiceOpen, setGenerateInvoiceOpen] = useState(false)
   const [generateProformaOpen, setGenerateProformaOpen] = useState(false)
+  const [historyOpen, setHistoryOpen] = useState(false)
   const [activeProforma, setActiveProforma] = useState(null)
   const [generatingPdf, setGeneratingPdf] = useState(false)
   const [markingDelivered, setMarkingDelivered] = useState(false)
@@ -590,7 +658,9 @@ export default function AdminJobCardEditor() {
   const [recommendationText, setRecommendationText] = useState('')
   const [pendingStatus, setPendingStatus] = useState(null)
   const [dropdownPos, setDropdownPos] = useState({ top: 0, left: 0, width: 0 })
+  const [statusDropdownPos, setStatusDropdownPos] = useState({ top: 0, left: 0 })
   const statusRef = useRef(null)
+  const statusDropdownRef = useRef(null)
   const vehRef = useRef(null)
   const vehSearchInputRef = useRef(null)
   const serviceComboRef = useRef(null)
@@ -837,7 +907,10 @@ export default function AdminJobCardEditor() {
   useEffect(() => {
     if (!statusOpen && !vehOpen && !serviceComboOpen) return undefined
     const down = (e) => {
-      if (statusRef.current && !statusRef.current.contains(e.target)) setStatusOpen(false)
+      if (
+        statusRef.current && !statusRef.current.contains(e.target) &&
+        statusDropdownRef.current && !statusDropdownRef.current.contains(e.target)
+      ) setStatusOpen(false)
       if (vehRef.current && !vehRef.current.contains(e.target)) setVehOpen(false)
       if (
         serviceComboRef.current && !serviceComboRef.current.contains(e.target) &&
@@ -847,6 +920,36 @@ export default function AdminJobCardEditor() {
     document.addEventListener('mousedown', down)
     return () => document.removeEventListener('mousedown', down)
   }, [statusOpen, vehOpen, serviceComboOpen])
+
+  // Calculate status dropdown position for portal rendering (avoids being
+  // clipped by the secondary toolbar's `overflow-hidden`, needed to keep its
+  // segmented-control corners rounded) and update on scroll/resize.
+  useEffect(() => {
+    if (!statusOpen || !statusRef.current) return
+
+    const updatePosition = () => {
+      if (statusRef.current) {
+        const rect = statusRef.current.getBoundingClientRect()
+        setStatusDropdownPos({
+          top: rect.bottom + 8,
+          left: rect.right - 208, // panel width w-52 = 13rem = 208px, right-aligned to trigger
+        })
+      }
+    }
+
+    updatePosition()
+
+    const scrollableParent = statusRef.current?.closest('main')
+    if (scrollableParent) scrollableParent.addEventListener('scroll', updatePosition, { passive: true })
+    window.addEventListener('scroll', updatePosition, { passive: true })
+    window.addEventListener('resize', updatePosition, { passive: true })
+
+    return () => {
+      if (scrollableParent) scrollableParent.removeEventListener('scroll', updatePosition)
+      window.removeEventListener('scroll', updatePosition)
+      window.removeEventListener('resize', updatePosition)
+    }
+  }, [statusOpen])
 
   // Calculate dropdown position for portal rendering and update on scroll/resize
   useEffect(() => {
@@ -1094,65 +1197,148 @@ export default function AdminJobCardEditor() {
             </div>
             <div className="flex flex-wrap items-center gap-2.5">
 
-              {/* ── Update status dropdown (hidden for new cards and once invoiced/delivered) ── */}
-              {!isNew && form.status !== 'invoiced' && form.status !== 'delivered' && (
-                <div className="relative" ref={statusRef}>
+              {/* ── Secondary toolbar: Update status / View Proforma / Download PDF —
+                   grouped into one segmented control instead of separate bordered
+                   buttons, so utility actions read as a single compact unit and the
+                   primary actions (Generate invoice / Save) stand out instead of
+                   competing visually with them. Wrapped in its own horizontal-scroll
+                   container so on narrow screens it scrolls as one unit instead of
+                   each button's label wrapping onto two lines internally. ── */}
+              <div className="max-w-full overflow-x-auto">
+                <div className="inline-flex items-center divide-x divide-slate-200 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:divide-slate-700 dark:border-slate-700 dark:bg-slate-900">
+                {/* Update status dropdown (hidden for new cards and once invoiced/delivered) */}
+                {!isNew && form.status !== 'invoiced' && form.status !== 'delivered' && (
+                  <div className="relative shrink-0" ref={statusRef}>
+                    <button
+                      type="button"
+                      onClick={() => setStatusOpen((o) => !o)}
+                      className="inline-flex items-center gap-2 whitespace-nowrap px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800"
+                    >
+                      <Pencil size={15} className="text-slate-400" />
+                      Update status
+                      <ChevronDown size={15} className={`text-slate-400 transition-transform duration-200 ${statusOpen ? 'rotate-180' : ''}`} />
+                    </button>
+                    {statusOpen &&
+                      ReactDOM.createPortal(
+                        <div
+                          ref={statusDropdownRef}
+                          className="fixed z-[9999] w-52 overflow-hidden rounded-xl border border-slate-100 bg-white shadow-xl ring-1 ring-black/5 dark:border-slate-700 dark:bg-slate-900"
+                          style={{ top: `${statusDropdownPos.top}px`, left: `${statusDropdownPos.left}px` }}
+                        >
+                          <div className="px-3 py-2 border-b border-slate-100 dark:border-slate-700">
+                            <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Change status</p>
+                          </div>
+                          <div className="py-1">
+                            {DROPDOWN_STATUS_OPTIONS.map((s) => {
+                              const isActive = form.status === s.value
+                              return (
+                                <button
+                                  key={s.value}
+                                  type="button"
+                                  onClick={async () => {
+                                    if (s.value === 'completed' && !isNew) {
+                                      setPendingStatus(s.value)
+                                      setRecommendationText('')
+                                      setRecommendationModalOpen(true)
+                                      setStatusOpen(false)
+                                    } else {
+                                      setForm((p) => ({ ...p, status: s.value }))
+                                      setStatusOpen(false)
+                                      if (!isNew) {
+                                        try {
+                                          await patchJobCard(routeId, { status: s.value })
+                                          showToast('success', `Status updated to ${s.label}`)
+                                        } catch (err) {
+                                          showToast('error', err.message || 'Failed to update status.')
+                                        }
+                                      }
+                                    }
+                                  }}
+                                  className={`flex w-full items-center gap-3 px-3 py-2.5 text-left text-sm transition-colors ${isActive
+                                    ? 'bg-slate-50 font-semibold text-slate-900 dark:bg-slate-800 dark:text-white'
+                                    : 'text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800'
+                                    }`}
+                                >
+                                  <span className={`h-1.5 w-1.5 rounded-full flex-shrink-0 ${isActive ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-slate-600'}`} />
+                                  {s.label}
+                                  {isActive && <Check size={13} className="ml-auto text-emerald-500" />}
+                                </button>
+                              )
+                            })}
+                          </div>
+                        </div>,
+                        document.body
+                      )}
+                  </div>
+                )}
+
+                {/* ── Create/View proforma invoice (any time before the job is
+                     invoiced/delivered/cancelled — it's a preliminary estimate,
+                     usable much earlier than "Generate invoice" which requires
+                     'completed'). Once one is active (draft/issued/approved),
+                     the backend blocks generating a second, unrelated one —
+                     show "View Proforma" instead, nudging toward "Create
+                     Revision" on the existing one rather than a parallel new
+                     number. ── */}
+                {!isNew && !['invoiced', 'delivered', 'cancelled'].includes(form.status) && (
+                  activeProforma ? (
+                    <button
+                      type="button"
+                      onClick={() => navigate(`/admin/proforma-invoices/${activeProforma.id}`)}
+                      className="inline-flex shrink-0 items-center gap-2 whitespace-nowrap px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800"
+                    >
+                      <FileText size={16} className="text-slate-400" />
+                      View Proforma ({activeProforma.proforma_number})
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setGenerateProformaOpen(true)}
+                      className="inline-flex shrink-0 items-center gap-2 whitespace-nowrap px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800"
+                    >
+                      <FileText size={16} className="text-slate-400" />
+                      Create Proforma Invoice
+                    </button>
+                  )
+                )}
+
+                {/* Download PDF */}
+                <button
+                  type="button"
+                  disabled={generatingPdf || form.status === 'job_control' || isNew}
+                  onClick={handleDownloadPdf}
+                  className="inline-flex shrink-0 items-center gap-2 whitespace-nowrap px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-40 dark:text-slate-300 dark:hover:bg-slate-800"
+                  title={form.status === 'job_control' ? 'Available after Job Control stage' : 'Download Job Card PDF'}
+                >
+                  {generatingPdf ? (
+                    <>
+                      <svg className="h-4 w-4 animate-spin text-slate-400" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+                      </svg>
+                      Generating…
+                    </>
+                  ) : (
+                    <>
+                      <Download size={16} className="text-slate-400" />
+                      Download PDF
+                    </>
+                  )}
+                </button>
+
+                {/* Status timeline (hidden for new cards — nothing to show yet) */}
+                {!isNew && (
                   <button
                     type="button"
-                    onClick={() => setStatusOpen((o) => !o)}
-                    className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
+                    onClick={() => setHistoryOpen(true)}
+                    className="inline-flex shrink-0 items-center gap-2 whitespace-nowrap px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800"
                   >
-                    <Pencil size={15} className="text-slate-400" />
-                    Update status
-                    <ChevronDown size={15} className={`text-slate-400 transition-transform duration-200 ${statusOpen ? 'rotate-180' : ''}`} />
+                    <History size={16} className="text-slate-400" />
+                    History
                   </button>
-                  {statusOpen && (
-                    <div className="absolute right-0 z-50 mt-2 w-52 overflow-hidden rounded-xl border border-slate-100 bg-white shadow-xl ring-1 ring-black/5 dark:border-slate-700 dark:bg-slate-900">
-                      <div className="px-3 py-2 border-b border-slate-100 dark:border-slate-700">
-                        <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Change status</p>
-                      </div>
-                      <div className="py-1">
-                        {DROPDOWN_STATUS_OPTIONS.map((s) => {
-                          const isActive = form.status === s.value
-                          return (
-                            <button
-                              key={s.value}
-                              type="button"
-                              onClick={async () => {
-                                if (s.value === 'completed' && !isNew) {
-                                  setPendingStatus(s.value)
-                                  setRecommendationText('')
-                                  setRecommendationModalOpen(true)
-                                  setStatusOpen(false)
-                                } else {
-                                  setForm((p) => ({ ...p, status: s.value }))
-                                  setStatusOpen(false)
-                                  if (!isNew) {
-                                    try {
-                                      await patchJobCard(routeId, { status: s.value })
-                                      showToast('success', `Status updated to ${s.label}`)
-                                    } catch (err) {
-                                      showToast('error', err.message || 'Failed to update status.')
-                                    }
-                                  }
-                                }
-                              }}
-                              className={`flex w-full items-center gap-3 px-3 py-2.5 text-left text-sm transition-colors ${isActive
-                                ? 'bg-slate-50 font-semibold text-slate-900 dark:bg-slate-800 dark:text-white'
-                                : 'text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800'
-                                }`}
-                            >
-                              <span className={`h-1.5 w-1.5 rounded-full flex-shrink-0 ${isActive ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-slate-600'}`} />
-                              {s.label}
-                              {isActive && <Check size={13} className="ml-auto text-emerald-500" />}
-                            </button>
-                          )
-                        })}
-                      </div>
-                    </div>
-                  )}
+                )}
                 </div>
-              )}
+              </div>
 
               {/* ── Mark as Delivered (only when invoiced) ── */}
               {form.status === 'invoiced' && (
@@ -1172,7 +1358,7 @@ export default function AdminJobCardEditor() {
                       setMarkingDelivered(false)
                     }
                   }}
-                  className="inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-white shadow-md transition hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="inline-flex shrink-0 items-center gap-2 whitespace-nowrap rounded-xl px-4 py-2.5 text-sm font-semibold text-white shadow-md transition hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
                   style={{ backgroundColor: '#059669' }}
                 >
                   {markingDelivered ? (
@@ -1192,43 +1378,13 @@ export default function AdminJobCardEditor() {
                 </button>
               )}
 
-              {/* ── Create/View proforma invoice (any time before the job is
-                   invoiced/delivered/cancelled — it's a preliminary estimate,
-                   usable much earlier than "Generate invoice" which requires
-                   'completed'). Once one is active (draft/issued/approved),
-                   the backend blocks generating a second, unrelated one —
-                   show "View Proforma" instead, nudging toward "Create
-                   Revision" on the existing one rather than a parallel new
-                   number. ── */}
-              {!isNew && !['invoiced', 'delivered', 'cancelled'].includes(form.status) && (
-                activeProforma ? (
-                  <button
-                    type="button"
-                    onClick={() => navigate(`/admin/proforma-invoices/${activeProforma.id}`)}
-                    className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
-                  >
-                    <FileText size={16} className="text-slate-400" />
-                    View Proforma ({activeProforma.proforma_number})
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => setGenerateProformaOpen(true)}
-                    className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
-                  >
-                    <FileText size={16} className="text-slate-400" />
-                    Create Proforma Invoice
-                  </button>
-                )
-              )}
-
               {/* ── Generate invoice (only when completed) ── */}
               {form.status === 'completed' && (
                 <button
                   type="button"
                   disabled={isNew}
                   onClick={() => setGenerateInvoiceOpen(true)}
-                  className="inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-white shadow-md transition hover:opacity-90 disabled:opacity-50"
+                  className="inline-flex shrink-0 items-center gap-2 whitespace-nowrap rounded-xl px-4 py-2.5 text-sm font-semibold text-white shadow-md transition hover:opacity-90 disabled:opacity-50"
                   style={{ backgroundColor: theme.accent }}
                 >
                   <FileText size={16} />
@@ -1236,46 +1392,29 @@ export default function AdminJobCardEditor() {
                 </button>
               )}
 
-              {/* ── Download PDF ── */}
-              <button
-                type="button"
-                disabled={generatingPdf || form.status === 'job_control' || isNew}
-                onClick={handleDownloadPdf}
-                className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:opacity-40 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
-                title={form.status === 'job_control' ? 'Available after Job Control stage' : 'Download Job Card PDF'}
-              >
-                {generatingPdf ? (
-                  <>
-                    <svg className="h-4 w-4 animate-spin text-slate-400" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
-                    </svg>
-                    Generating…
-                  </>
-                ) : (
-                  <>
-                    <Download size={16} className="text-slate-400" />
-                    Download PDF
-                  </>
-                )}
-              </button>
-
+              {/* ── Save job card: the primary action on this page, so it gets
+                   the accent-filled treatment instead of blending in with the
+                   secondary toolbar's bordered/white style. ── */}
               <button
                 type="button"
                 disabled={saving || isLocked}
                 onClick={() => void persist()}
-                className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-800 shadow-sm transition-all hover:bg-slate-50 disabled:opacity-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700"
+                className="inline-flex shrink-0 items-center gap-2 whitespace-nowrap rounded-xl px-5 py-2.5 text-sm font-semibold text-white shadow-md transition hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
+                style={{ backgroundColor: theme.accent }}
               >
                 {saving ? (
                   <>
-                    <svg className="h-4 w-4 animate-spin text-slate-500" fill="none" viewBox="0 0 24 24">
+                    <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
                     </svg>
                     Saving…
                   </>
                 ) : (
-                  'Save job card'
+                  <>
+                    <Save size={16} />
+                    Save job card
+                  </>
                 )}
               </button>
             </div>
@@ -2005,6 +2144,10 @@ export default function AdminJobCardEditor() {
             navigate(`/admin/proforma-invoices/${proforma.id}`)
           }}
         />
+      )}
+
+      {historyOpen && (
+        <StatusTimelineModal jobCardId={routeId} onClose={() => setHistoryOpen(false)} />
       )}
     </>
   )

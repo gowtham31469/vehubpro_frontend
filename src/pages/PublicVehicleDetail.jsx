@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, Calendar, Car, Check, CheckCircle2, ChevronLeft, ChevronRight, Cog, Copy, Fuel, Gauge, Heart, Mail, Share2, ShieldCheck, Sparkles, X } from 'lucide-react'
+import { ArrowLeft, Calendar, Car, Check, CheckCircle2, ChevronLeft, ChevronRight, Cog, Copy, Fuel, Gauge, Heart, Mail, Maximize2, Phone, Share2, ShieldCheck, Sparkles, X } from 'lucide-react'
 import { useTenantBranding } from '../context/TenantBrandingContext.jsx'
 import { useToast } from '../context/ToastContext.jsx'
 import { fetchPublicInventoryVehicleDetail } from '../utils/publicPortfolio'
@@ -60,6 +60,7 @@ export default function PublicVehicleDetail() {
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
   const [activePhoto, setActivePhoto] = useState(0)
+  const [lightboxOpen, setLightboxOpen] = useState(false)
   const [isWishlisted, setIsWishlisted] = useState(false)
   const [alreadyRequestedVisit, setAlreadyRequestedVisit] = useState(false)
   const [visitModalOpen, setVisitModalOpen] = useState(false)
@@ -70,6 +71,7 @@ export default function PublicVehicleDetail() {
   const [visitError, setVisitError] = useState('')
   const thumbScrollRef = useRef(null)
   const featuresScrollRef = useRef(null)
+  const touchStartXRef = useRef(null)
 
   useEffect(() => {
     if (!isCustomerAuthenticated() || !id) return
@@ -118,6 +120,22 @@ export default function PublicVehicleDetail() {
 
   const scrollThumbs = (dir) => thumbScrollRef.current?.scrollBy({ left: dir * 300, behavior: 'smooth' })
   const scrollFeatures = (dir) => featuresScrollRef.current?.scrollBy({ left: dir * 220, behavior: 'smooth' })
+
+  // Swipe-to-change-photo on the main hero image — the prev/next arrow
+  // buttons work on tap too, but swipe is the interaction mobile users
+  // actually reach for first.
+  const SWIPE_THRESHOLD_PX = 40
+  const handlePhotoTouchStart = (e) => {
+    touchStartXRef.current = e.touches[0].clientX
+  }
+  const handlePhotoTouchEnd = (e, photoCount) => {
+    if (touchStartXRef.current == null || photoCount < 2) return
+    const delta = e.changedTouches[0].clientX - touchStartXRef.current
+    touchStartXRef.current = null
+    if (Math.abs(delta) < SWIPE_THRESHOLD_PX) return
+    if (delta < 0) setActivePhoto((p) => (p + 1) % photoCount)
+    else setActivePhoto((p) => (p - 1 + photoCount) % photoCount)
+  }
 
   const handleCopyLink = async () => {
     try {
@@ -180,6 +198,23 @@ export default function PublicVehicleDetail() {
   const hasServices = branding?.has_services_access === true
 
   const photos = vehicle?.photo_urls || []
+
+  useEffect(() => {
+    if (!lightboxOpen) return undefined
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    const onKeyDown = (e) => {
+      if (e.key === 'Escape') setLightboxOpen(false)
+      else if (e.key === 'ArrowLeft') setActivePhoto((p) => (p - 1 + photos.length) % photos.length)
+      else if (e.key === 'ArrowRight') setActivePhoto((p) => (p + 1) % photos.length)
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => {
+      document.body.style.overflow = previousOverflow
+      window.removeEventListener('keydown', onKeyDown)
+    }
+  }, [lightboxOpen, photos.length])
+
   // Backend already nulls both fields out once offer_valid_until has passed,
   // so a non-null original_price here always means a live, valid offer.
   const hasOffer = vehicle?.original_price != null && Number(vehicle.original_price) > Number(vehicle.listing_price)
@@ -240,13 +275,28 @@ export default function PublicVehicleDetail() {
                 than the space left after the 380px panel and push that panel
                 off-screen — min-w-0 lets it actually shrink to fit. */}
             <div className="min-w-0">
-              <div className="relative aspect-video overflow-hidden rounded-2xl border border-slate-200 bg-slate-100 shadow-sm">
+              <div
+                className="relative aspect-video touch-pan-y overflow-hidden rounded-2xl border border-slate-200 bg-slate-100 shadow-sm"
+                onTouchStart={handlePhotoTouchStart}
+                onTouchEnd={(e) => handlePhotoTouchEnd(e, photos.length)}
+              >
                 {photos[activePhoto] ? (
-                  <img
-                    src={photos[activePhoto]}
-                    alt={`${vehicle.brand_name} ${vehicle.vehicle_model_name} — photo ${activePhoto + 1}`}
-                    className="h-full w-full object-cover"
-                  />
+                  <button
+                    type="button"
+                    onClick={() => setLightboxOpen(true)}
+                    className="group block h-full w-full cursor-zoom-in"
+                    aria-label="Open full-size photo"
+                  >
+                    <img
+                      src={photos[activePhoto]}
+                      alt={`${vehicle.brand_name} ${vehicle.vehicle_model_name} — photo ${activePhoto + 1}`}
+                      className="h-full w-full object-cover"
+                    />
+                    <span className="absolute bottom-3 left-3 flex items-center gap-1.5 rounded-full bg-black/60 px-2.5 py-1 text-xs font-bold text-white opacity-90 transition group-hover:opacity-100">
+                      <Maximize2 size={13} />
+                      <span className="hidden sm:inline">View full size</span>
+                    </span>
+                  </button>
                 ) : (
                   <div className="flex h-full items-center justify-center">
                     <Car size={48} className="text-slate-300" />
@@ -284,14 +334,14 @@ export default function PublicVehicleDetail() {
                 <div className="relative mt-3">
                   <div
                     ref={thumbScrollRef}
-                    className="flex gap-2 overflow-x-auto pb-1 scroll-smooth [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                    className="flex snap-x snap-mandatory gap-2 overflow-x-auto pb-1 scroll-smooth [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
                   >
                     {photos.map((url, i) => (
                       <button
                         key={url}
                         type="button"
                         onClick={() => setActivePhoto(i)}
-                        className="h-16 w-24 shrink-0 overflow-hidden rounded-lg border-2 transition"
+                        className="h-14 w-20 shrink-0 snap-start overflow-hidden rounded-lg border-2 transition sm:h-16 sm:w-24"
                         style={{ borderColor: i === activePhoto ? ACCENT : '#E2E8F0' }}
                       >
                         <img src={url} alt="" className="h-full w-full object-cover" />
@@ -303,7 +353,7 @@ export default function PublicVehicleDetail() {
                       <button
                         type="button"
                         onClick={() => scrollThumbs(-1)}
-                        className="absolute -left-3 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-lg transition hover:text-slate-900"
+                        className="absolute -left-3 top-1/2 hidden h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-lg transition hover:text-slate-900 sm:flex"
                         aria-label="Scroll thumbnails left"
                       >
                         <ChevronLeft size={14} />
@@ -311,13 +361,21 @@ export default function PublicVehicleDetail() {
                       <button
                         type="button"
                         onClick={() => scrollThumbs(1)}
-                        className="absolute -right-3 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-lg transition hover:text-slate-900"
+                        className="absolute -right-3 top-1/2 hidden h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-lg transition hover:text-slate-900 sm:flex"
                         aria-label="Scroll thumbnails right"
                       >
                         <ChevronRight size={14} />
                       </button>
                     </>
                   ) : null}
+                </div>
+              ) : null}
+
+              {/* Description */}
+              {vehicle.description ? (
+                <div className="mt-8 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm shadow-slate-200/70">
+                  <h2 className="text-lg font-extrabold uppercase tracking-tight text-slate-900">Description</h2>
+                  <p className="mt-3 whitespace-pre-line text-sm leading-relaxed text-slate-600">{vehicle.description}</p>
                 </div>
               ) : null}
 
@@ -486,6 +544,17 @@ export default function PublicVehicleDetail() {
                   </button>
                 )}
 
+                {branding?.phone ? (
+                  <a
+                    href={`tel:${branding.phone}`}
+                    className="mt-2.5 flex w-full items-center justify-center gap-2 rounded-full border-2 py-3 text-sm font-bold transition hover:opacity-80"
+                    style={{ borderColor: ACCENT, color: ACCENT }}
+                  >
+                    <Phone size={16} />
+                    Call {tenantName || 'Dealer'}
+                  </a>
+                ) : null}
+
                 <div className="mt-5 flex items-center gap-2 text-xs text-slate-400">
                   <ShieldCheck size={14} />
                   Verified listing from {tenantName || 'this dealership'}
@@ -597,6 +666,77 @@ export default function PublicVehicleDetail() {
               </button>
             </form>
           </div>
+        </div>
+      ) : null}
+
+      {lightboxOpen && photos[activePhoto] ? (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/95 p-4"
+          onClick={() => setLightboxOpen(false)}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Photo preview"
+        >
+          <button
+            type="button"
+            onClick={() => setLightboxOpen(false)}
+            aria-label="Close preview"
+            className="absolute right-4 top-4 flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white transition hover:bg-white/20"
+          >
+            <X size={20} />
+          </button>
+          <span className="absolute left-4 top-4 rounded-full bg-white/10 px-3 py-1.5 text-sm font-bold text-white">
+            {activePhoto + 1} / {photos.length}
+          </span>
+
+          {photos.length > 1 ? (
+            <>
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); setActivePhoto((p) => (p - 1 + photos.length) % photos.length) }}
+                aria-label="Previous photo"
+                className="absolute left-2 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-white/10 text-white transition hover:bg-white/20 sm:left-4"
+              >
+                <ChevronLeft size={22} />
+              </button>
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); setActivePhoto((p) => (p + 1) % photos.length) }}
+                aria-label="Next photo"
+                className="absolute right-2 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-white/10 text-white transition hover:bg-white/20 sm:right-4"
+              >
+                <ChevronRight size={22} />
+              </button>
+            </>
+          ) : null}
+
+          <img
+            src={photos[activePhoto]}
+            alt={`${vehicle.brand_name} ${vehicle.vehicle_model_name} — photo ${activePhoto + 1}`}
+            className="max-h-[85vh] max-w-[92vw] touch-pan-y select-none object-contain sm:max-w-[85vw]"
+            onClick={(e) => e.stopPropagation()}
+            onTouchStart={handlePhotoTouchStart}
+            onTouchEnd={(e) => handlePhotoTouchEnd(e, photos.length)}
+          />
+
+          {photos.length > 1 ? (
+            <div
+              className="absolute bottom-4 left-1/2 flex max-w-[90vw] -translate-x-1/2 gap-2 overflow-x-auto px-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {photos.map((url, i) => (
+                <button
+                  key={url}
+                  type="button"
+                  onClick={() => setActivePhoto(i)}
+                  className="h-12 w-16 shrink-0 overflow-hidden rounded-md border-2 opacity-70 transition hover:opacity-100"
+                  style={{ borderColor: i === activePhoto ? ACCENT : 'transparent', opacity: i === activePhoto ? 1 : undefined }}
+                >
+                  <img src={url} alt="" className="h-full w-full object-cover" />
+                </button>
+              ))}
+            </div>
+          ) : null}
         </div>
       ) : null}
     </div>

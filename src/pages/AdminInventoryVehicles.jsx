@@ -159,9 +159,14 @@ export default function AdminInventoryVehicles() {
                                   <Car size={18} className="text-slate-400" />
                                 )}
                               </div>
-                              <div>
+                              <div className="min-w-0">
                                 <p className="font-semibold text-slate-900 dark:text-white">{r.brand_name} {r.vehicle_model_name}</p>
                                 <p className="text-xs text-slate-400 dark:text-slate-500">{r.registration_no || '—'}</p>
+                                {r.description ? (
+                                  <p className="mt-0.5 max-w-xs truncate text-xs text-slate-400 dark:text-slate-500" title={r.description}>
+                                    {r.description}
+                                  </p>
+                                ) : null}
                               </div>
                             </div>
                           </td>

@@ -262,7 +262,7 @@ function RevisionHistoryModal({ proformaId, onClose }) {
                   {rev.revision_reason ? <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">{rev.revision_reason}</p> : null}
                 </div>
                 <div className="shrink-0 text-right">
-                  <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-bold ${statusBadgeStyle(rev.status)}`}>{rev.status}</span>
+                  <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-bold uppercase ${statusBadgeStyle(rev.status)}`}>{rev.status}</span>
                   <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">{formatDateTime(rev.created_at)}</p>
                 </div>
               </button>
@@ -285,6 +285,10 @@ function RecordAdvancePaymentModal({ proforma, onClose, onSuccess }) {
   const [form, setForm] = useState({ amount: '', payment_mode: 'cash', payment_reference: '', remarks: '' })
 
   const modeMeta = PAYMENT_MODES.find((m) => m.value === form.payment_mode) || PAYMENT_MODES[0]
+  // Matches the backend's cap in AdvancePaymentService.record() — shown here
+  // as an upfront hint so the mistake (like entering more than the estimate
+  // itself) is obvious before submitting, not just after a server error.
+  const remainingBalance = Math.max(0, Number(proforma.total_amount || 0) - Number(proforma.advance_received_total || 0))
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -318,11 +322,14 @@ function RecordAdvancePaymentModal({ proforma, onClose, onSuccess }) {
           <div>
             <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400">Amount (₹)</label>
             <input
-              type="number" step="0.01" min="0.01" required
+              type="number" step="0.01" min="0.01" max={remainingBalance} required
               value={form.amount}
               onChange={(e) => setForm((p) => ({ ...p, amount: e.target.value }))}
               className="mt-1 w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 px-3 py-2.5 text-right text-sm tabular-nums outline-none focus:border-slate-400 dark:focus:border-slate-600"
             />
+            <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">
+              Remaining balance: {fmtMoney(remainingBalance)}
+            </p>
           </div>
           <div>
             <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400">Payment mode</label>
@@ -384,6 +391,7 @@ function AdvancePaymentsSection({ proforma, canRecord, onChanged }) {
   const { theme } = useTenantBranding()
   const { showToast } = useToast()
   const [recordOpen, setRecordOpen] = useState(false)
+  const [listOpen, setListOpen] = useState(false)
   const [downloadingId, setDownloadingId] = useState(null)
   const [payments, setPayments] = useState(proforma.advance_payments || [])
   const [loading, setLoading] = useState(false)
@@ -416,75 +424,95 @@ function AdvancePaymentsSection({ proforma, canRecord, onChanged }) {
     }
   }
 
+  const paymentsTable = (
+    <div className="overflow-x-auto">
+      <table className="min-w-full text-sm">
+        <thead className="bg-slate-50 text-left text-xs font-bold uppercase tracking-wide text-slate-500 dark:bg-slate-800/50 dark:text-slate-400">
+          <tr>
+            <th className="px-4 py-3">Date</th>
+            <th className="px-4 py-3">Receipt No.</th>
+            <th className="px-4 py-3 text-right">Amount</th>
+            <th className="px-4 py-3">Mode</th>
+            <th className="px-4 py-3">Reference</th>
+            <th className="px-4 py-3">Status</th>
+            <th className="px-4 py-3">Recorded By</th>
+            <th className="px-4 py-3 text-center">Receipt</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
+          {payments.map((p) => (
+            <tr key={p.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40">
+              <td className="px-4 py-3 text-slate-500 dark:text-slate-400">{formatDateTime(p.created_at)}</td>
+              <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{p.receipt_number || '—'}</td>
+              <td className="px-4 py-3 text-right font-semibold text-slate-800 dark:text-slate-200">{fmtMoney(p.amount)}</td>
+              <td className="px-4 py-3 text-slate-600 dark:text-slate-400">{p.payment_mode_display}</td>
+              <td className="px-4 py-3 text-slate-500 dark:text-slate-400">{p.payment_reference || '—'}</td>
+              <td className="px-4 py-3">
+                <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-bold ${advanceStatusStyle(p.status)}`}>{p.status_display}</span>
+              </td>
+              <td className="px-4 py-3 text-slate-500 dark:text-slate-400">{p.received_by_name || '—'}</td>
+              <td className="px-4 py-3 text-center">
+                {p.receipt_number ? (
+                  <button
+                    type="button"
+                    disabled={downloadingId === p.id}
+                    onClick={() => downloadReceipt(p.id)}
+                    title="Download receipt"
+                    className="rounded-lg p-2 text-slate-600 hover:bg-slate-100 disabled:opacity-50 dark:text-slate-400 dark:hover:bg-slate-800"
+                  >
+                    <Receipt size={16} />
+                  </button>
+                ) : '—'}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+
   return (
     <div className="mt-6 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800/60 dark:bg-slate-900/40">
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 p-5 dark:border-slate-800">
+      {/* Compact strip only — the full payment table lives in a modal (same
+          pattern as the Invoice detail page's "Payment History" modal) so this
+          section never pushes the PDF preview further down the page as more
+          advances get recorded. */}
+      <div className="flex flex-wrap items-center justify-between gap-3 p-5">
         <div>
           <h3 className="flex items-center gap-2 text-base font-bold text-slate-900 dark:text-white">
             <Wallet size={18} /> Advance Payments
           </h3>
           <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-            {payments.length === 0 ? 'No advances recorded yet.' : `${fmtMoney(totalReceived)} received so far.`}
+            {payments.length > 0
+              ? `${fmtMoney(totalReceived)} received so far.`
+              : !canRecord && proforma.status === 'issued'
+                ? 'Approve this proforma to start recording advances.'
+                : 'No advances recorded yet.'}
           </p>
         </div>
-        {canRecord ? (
-          <button
-            type="button"
-            onClick={() => setRecordOpen(true)}
-            className="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90"
-            style={{ backgroundColor: theme.accent }}
-          >
-            <Wallet size={15} /> Record Advance
-          </button>
-        ) : null}
-      </div>
-
-      {payments.length > 0 ? (
-        <div className="overflow-x-auto">
-          <table className="min-w-full text-sm">
-            <thead className="bg-slate-50 text-left text-xs font-bold uppercase tracking-wide text-slate-500 dark:bg-slate-800/50 dark:text-slate-400">
-              <tr>
-                <th className="px-4 py-3">Date</th>
-                <th className="px-4 py-3">Receipt No.</th>
-                <th className="px-4 py-3 text-right">Amount</th>
-                <th className="px-4 py-3">Mode</th>
-                <th className="px-4 py-3">Reference</th>
-                <th className="px-4 py-3">Status</th>
-                <th className="px-4 py-3">Recorded By</th>
-                <th className="px-4 py-3 text-center">Receipt</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
-              {payments.map((p) => (
-                <tr key={p.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40">
-                  <td className="px-4 py-3 text-slate-500 dark:text-slate-400">{formatDateTime(p.created_at)}</td>
-                  <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{p.receipt_number || '—'}</td>
-                  <td className="px-4 py-3 text-right font-semibold text-slate-800 dark:text-slate-200">{fmtMoney(p.amount)}</td>
-                  <td className="px-4 py-3 text-slate-600 dark:text-slate-400">{p.payment_mode_display}</td>
-                  <td className="px-4 py-3 text-slate-500 dark:text-slate-400">{p.payment_reference || '—'}</td>
-                  <td className="px-4 py-3">
-                    <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-bold ${advanceStatusStyle(p.status)}`}>{p.status_display}</span>
-                  </td>
-                  <td className="px-4 py-3 text-slate-500 dark:text-slate-400">{p.received_by_name || '—'}</td>
-                  <td className="px-4 py-3 text-center">
-                    {p.receipt_number ? (
-                      <button
-                        type="button"
-                        disabled={downloadingId === p.id}
-                        onClick={() => downloadReceipt(p.id)}
-                        title="Download receipt"
-                        className="rounded-lg p-2 text-slate-600 hover:bg-slate-100 disabled:opacity-50 dark:text-slate-400 dark:hover:bg-slate-800"
-                      >
-                        <Receipt size={16} />
-                      </button>
-                    ) : '—'}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="flex items-center gap-2">
+          {payments.length > 0 ? (
+            <button
+              type="button"
+              onClick={() => setListOpen(true)}
+              className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+            >
+              <Receipt size={15} /> View ({payments.length})
+            </button>
+          ) : null}
+          {canRecord ? (
+            <button
+              type="button"
+              onClick={() => setRecordOpen(true)}
+              className="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90"
+              style={{ backgroundColor: theme.accent }}
+            >
+              <Wallet size={15} /> Record Advance
+            </button>
+          ) : null}
         </div>
-      ) : null}
+      </div>
+      {loading ? <p className="px-5 pb-3 text-xs text-slate-400">Refreshing…</p> : null}
 
       {recordOpen ? (
         <RecordAdvancePaymentModal
@@ -493,7 +521,20 @@ function AdvancePaymentsSection({ proforma, canRecord, onChanged }) {
           onSuccess={() => { reload(); onChanged?.() }}
         />
       ) : null}
-      {loading ? <p className="px-5 py-3 text-xs text-slate-400">Refreshing…</p> : null}
+
+      {listOpen ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-4xl rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-100 p-5 dark:border-slate-800">
+              <h3 className="text-lg font-bold text-slate-900 dark:text-white">Advance Payments</h3>
+              <button type="button" onClick={() => setListOpen(false)} aria-label="Close" className="text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200">
+                <X size={18} />
+              </button>
+            </div>
+            <div className="max-h-[70vh] overflow-y-auto">{paymentsTable}</div>
+          </div>
+        </div>
+      ) : null}
     </div>
   )
 }
@@ -589,8 +630,19 @@ export default function AdminProformaInvoiceDetail() {
   const canApproveOrReject = status === 'issued'
   const canCancel = ['draft', 'issued', 'approved'].includes(status)
   const canRevise = ['issued', 'approved', 'rejected', 'expired'].includes(status)
-  const canConvert = status === 'approved' && proforma.is_latest
-  const canRecordAdvance = ['issued', 'approved'].includes(status)
+  // The job card may already have a real invoice generated directly from the
+  // job card itself (not via this proforma) — in that case converting would
+  // just fail with "invoice already exists", and collecting further advances
+  // against it can never be applied to anything. Hide both actions instead
+  // of letting the user hit that error.
+  const jobCardAlreadyInvoiced = ['invoiced', 'delivered'].includes(proforma.job_card_status)
+  const canConvert = status === 'approved' && proforma.is_latest && !jobCardAlreadyInvoiced
+  // Advances can only be recorded once 'approved' — not merely 'issued' —
+  // so money is never collected against an estimate the customer hasn't
+  // actually confirmed yet (and so it's never stranded if staff later
+  // generate the invoice directly from the job card instead of converting
+  // this proforma, since only conversion credits an advance into the invoice).
+  const canRecordAdvance = status === 'approved' && !jobCardAlreadyInvoiced
 
   return (
     <>
@@ -627,6 +679,12 @@ export default function AdminProformaInvoiceDetail() {
             </div>
           ) : null}
 
+          {jobCardAlreadyInvoiced ? (
+            <div className="mb-4 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-900/40 dark:text-slate-400">
+              The job card for this proforma has already been invoiced directly — converting this proforma or recording further advances against it is disabled.
+            </div>
+          ) : null}
+
           {proforma.invoice ? (
             <div className="mb-4 rounded-xl border border-violet-200 bg-violet-50 px-4 py-3 text-sm text-violet-800 dark:border-violet-900/40 dark:bg-violet-900/10 dark:text-violet-300">
               Converted to invoice{' '}
@@ -647,7 +705,7 @@ export default function AdminProformaInvoiceDetail() {
               <div>
                 <div className="flex items-center gap-2">
                   <h1 className="text-xl font-bold text-slate-900 dark:text-white">Proforma Invoice Preview</h1>
-                  <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-bold ${statusBadgeStyle(status)}`}>{status}</span>
+                  <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-bold uppercase ${statusBadgeStyle(status)}`}>{status}</span>
                 </div>
                 <p className="text-xs text-slate-500 dark:text-slate-400">{proforma.proforma_number} · v{proforma.version} · {fmtMoney(proforma.total_amount)} estimate</p>
               </div>
@@ -784,13 +842,13 @@ export default function AdminProformaInvoiceDetail() {
             </div>
           </div>
 
+          <AdvancePaymentsSection proforma={proforma} canRecord={canRecordAdvance} onChanged={load} />
+
           {previewHtml ? (
             <ProformaPreviewFrame html={previewHtml} />
           ) : (
             <div className="py-20 text-center text-slate-400 dark:text-slate-500">Loading preview…</div>
           )}
-
-          <AdvancePaymentsSection proforma={proforma} canRecord={canRecordAdvance} onChanged={load} />
 
         </div>
       </AdminShell>
