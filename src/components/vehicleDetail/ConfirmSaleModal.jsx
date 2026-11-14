@@ -17,7 +17,7 @@ export default function ConfirmSaleModal({ bookings = [], onClose, onSubmit }) {
   const { theme } = useTenantBranding()
   const [form, setForm] = useState({
     buyer: '', booking: '', sale_date: todayLocalDateString(),
-    final_sale_price: '', discount_amount: '', salesperson: '', notes: '',
+    final_sale_price: '', discount_amount: '', expected_loan_amount: '', salesperson: '', notes: '',
   })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -33,6 +33,7 @@ export default function ConfirmSaleModal({ bookings = [], onClose, onSubmit }) {
         sale_date: form.sale_date,
         final_sale_price: form.final_sale_price,
         discount_amount: form.discount_amount || 0,
+        expected_loan_amount: form.expected_loan_amount || null,
         salesperson: form.salesperson || null,
         notes: form.notes || '',
       })
@@ -84,7 +85,22 @@ export default function ConfirmSaleModal({ bookings = [], onClose, onSubmit }) {
               <label className={labelCls}>Discount Amount</label>
               <input type="number" min="0" step="0.01" value={form.discount_amount} onChange={(e) => setForm((p) => ({ ...p, discount_amount: e.target.value }))} className={inputCls} />
             </div>
+            <div>
+              <label className={labelCls}>Expected Loan Amount</label>
+              <input
+                type="number" min="0" step="0.01" max={form.final_sale_price || undefined}
+                value={form.expected_loan_amount}
+                onChange={(e) => setForm((p) => ({ ...p, expected_loan_amount: e.target.value }))}
+                className={inputCls}
+                placeholder="0.00"
+              />
+            </div>
           </div>
+          {form.expected_loan_amount ? (
+            <p className="-mt-2 text-xs text-slate-400">
+              Planning only — how much of this sale the buyer expects to cover via a bank/NBFC loan, so you know what to expect directly vs. from the lender. Record the actual disbursement as a payment once it arrives.
+            </p>
+          ) : null}
 
           <StaffPicker value={form.salesperson} onChange={(v) => setForm((p) => ({ ...p, salesperson: v }))} label="Salesperson" />
 

@@ -80,7 +80,7 @@ export default function PublicCustomerWishlist() {
                 className="mt-4 inline-flex rounded-full px-5 py-2.5 text-sm font-bold text-white transition hover:opacity-90"
                 style={{ backgroundColor: ACCENT }}
               >
-                Browse Inventory
+                Browse All Cars
               </Link>
             ) : null}
           </div>

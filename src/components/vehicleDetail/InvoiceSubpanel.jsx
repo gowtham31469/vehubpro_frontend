@@ -76,6 +76,17 @@ export default function InvoiceSubpanel({ sale, vehicle, showToast }) {
             {fmtMoney(invoice.amount_paid)} paid of {fmtMoney(invoice.sale_amount)}
           </p>
 
+          {Number(invoice.expected_loan_amount || 0) > 0 ? (
+            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+              Expected via loan: {fmtMoney(invoice.expected_loan_amount)}
+              {' · '}received so far: {fmtMoney(
+                (invoice.payments || [])
+                  .filter((p) => p.payment_mode === 'loan')
+                  .reduce((sum, p) => sum + Number(p.amount || 0), 0)
+              )}
+            </p>
+          ) : null}
+
           {invoice.payments && invoice.payments.length > 0 ? (
             <div className="mt-2 space-y-1">
               {invoice.payments.map((p) => (

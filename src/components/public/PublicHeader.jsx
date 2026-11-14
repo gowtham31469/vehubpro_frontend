@@ -26,7 +26,7 @@ export default function PublicHeader({ brandingLogoUrl, tenantName, showInventor
         <nav className="hidden items-center gap-8 text-sm font-semibold text-slate-500 md:flex">
           <button type="button" onClick={onHomeClick} className="text-slate-900">Home</button>
           {showInventory ? (
-            <Link to="/portfolio/inventory" className="transition hover:text-slate-900">Inventory</Link>
+            <Link to="/portfolio/inventory" className="transition hover:text-slate-900">All Cars</Link>
           ) : null}
           {showServices ? (
             <Link to="/portfolio/services" className="transition hover:text-slate-900">Services</Link>

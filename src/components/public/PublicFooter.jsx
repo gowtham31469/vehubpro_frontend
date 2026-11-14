@@ -28,7 +28,7 @@ export default function PublicFooter({ brandingLogoUrl, tenantName, branding, sh
           <div className="flex flex-wrap justify-center gap-x-8 gap-y-2 text-sm text-slate-500 sm:justify-end">
             <button type="button" onClick={onHomeClick} className="hover:text-slate-900">Home</button>
             {showInventory ? (
-              <Link to="/portfolio/inventory" className="hover:text-slate-900">Inventory</Link>
+              <Link to="/portfolio/inventory" className="hover:text-slate-900">All Cars</Link>
             ) : null}
             {showServices ? (
               <Link to="/portfolio/services" className="hover:text-slate-900">Services</Link>

@@ -103,7 +103,7 @@ export default function PublicPortfolio() {
                 className="rounded-full px-6 py-3 text-sm font-bold text-white transition hover:opacity-90"
                 style={{ backgroundColor: ACCENT, boxShadow: BTN_SHADOW }}
               >
-                View Inventory
+                View All Cars
               </Link>
               <Link
                 to="/portfolio/contact"
@@ -169,12 +169,12 @@ export default function PublicPortfolio() {
           <div className="rounded-2xl border border-slate-200 bg-white p-7 shadow-sm shadow-slate-200/70">
             <p className="text-xs font-bold uppercase tracking-wide text-slate-500">{vehicles.length} vehicles listed</p>
             <h3 className="mt-2 text-xl font-extrabold text-slate-900">See Everything In Stock</h3>
-            <p className="mt-2 text-sm text-slate-500">Browse the full, filterable inventory in one place.</p>
+            <p className="mt-2 text-sm text-slate-500">Browse the full, filterable list of cars in one place.</p>
             <Link
               to="/portfolio/inventory"
               className="mt-5 inline-block rounded-full border border-slate-300 px-5 py-2.5 text-sm font-bold text-slate-700 shadow-sm transition hover:bg-slate-50"
             >
-              View Inventory
+              View All Cars
             </Link>
           </div>
         </div>

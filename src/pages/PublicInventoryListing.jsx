@@ -468,7 +468,7 @@ export default function PublicInventoryListing() {
           </Link>
           <nav className="hidden items-center gap-8 text-sm font-semibold text-slate-500 md:flex">
             <Link to="/" className="transition hover:text-slate-900">Home</Link>
-            <span className="text-slate-900">Inventory</span>
+            <span className="text-slate-900">All Cars</span>
             {hasServices ? (
               <Link to="/portfolio/services" className="transition hover:text-slate-900">Services</Link>
             ) : null}
@@ -480,7 +480,7 @@ export default function PublicInventoryListing() {
 
       <div className="mx-auto max-w-[1240px] px-6 py-10">
         <div className="mb-8">
-          <h1 className="text-2xl font-extrabold uppercase tracking-tight text-slate-900 md:text-3xl">Full Inventory</h1>
+          <h1 className="text-2xl font-extrabold uppercase tracking-tight text-slate-900 md:text-3xl">All Cars</h1>
           <p className="mt-1 text-sm text-slate-500">
             {loading ? 'Loading vehicles…' : `${filteredVehicles.length} vehicle${filteredVehicles.length === 1 ? '' : 's'} found`}
           </p>

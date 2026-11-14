@@ -105,7 +105,7 @@ export default function PublicServicesListing() {
           <nav className="hidden items-center gap-8 text-sm font-semibold text-slate-500 md:flex">
             <Link to="/" className="transition hover:text-slate-900">Home</Link>
             {hasPortfolio ? (
-              <Link to="/portfolio/inventory" className="transition hover:text-slate-900">Inventory</Link>
+              <Link to="/portfolio/inventory" className="transition hover:text-slate-900">All Cars</Link>
             ) : null}
             <span className="text-slate-900">Services</span>
             <Link to="/portfolio/contact" className="transition hover:text-slate-900">Contact</Link>

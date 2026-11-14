@@ -9,6 +9,9 @@ const PAYMENT_MODES = [
   { id: 'card', name: 'Card' },
   { id: 'bank_transfer', name: 'Bank Transfer' },
   { id: 'cheque', name: 'Cheque' },
+  // Distinct from Bank Transfer: money a lender disburses straight to the
+  // dealer on the buyer's behalf, not a transfer the buyer made themselves.
+  { id: 'loan', name: 'Loan / Financing' },
 ]
 
 function fmtMoney(n) {
@@ -66,7 +69,12 @@ export default function RecordSaleInvoicePaymentModal({ invoice, onClose, onSubm
           </div>
           <div>
             <label className={labelCls}>Reference (optional)</label>
-            <input value={form.payment_reference} onChange={(e) => setForm((p) => ({ ...p, payment_reference: e.target.value }))} className={inputCls} />
+            <input
+              value={form.payment_reference}
+              onChange={(e) => setForm((p) => ({ ...p, payment_reference: e.target.value }))}
+              placeholder={form.payment_mode === 'loan' ? 'Lender name / loan reference no.' : undefined}
+              className={inputCls}
+            />
           </div>
           <div className="flex justify-end gap-2 pt-2">
             <button type="button" onClick={onClose} className="rounded-xl px-4 py-2 text-sm font-semibold text-slate-600 dark:text-slate-400">Cancel</button>

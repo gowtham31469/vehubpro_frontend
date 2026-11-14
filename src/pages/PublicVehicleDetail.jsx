@@ -242,7 +242,7 @@ export default function PublicVehicleDetail() {
           </Link>
           <nav className="hidden items-center gap-8 text-sm font-semibold text-slate-500 md:flex">
             <Link to="/" className="transition hover:text-slate-900">Home</Link>
-            <Link to="/portfolio/inventory" className="text-slate-900">Inventory</Link>
+            <Link to="/portfolio/inventory" className="text-slate-900">All Cars</Link>
             {hasServices ? (
               <Link to="/portfolio/services" className="transition hover:text-slate-900">Services</Link>
             ) : null}

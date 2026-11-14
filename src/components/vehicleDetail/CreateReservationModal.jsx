@@ -14,7 +14,7 @@ const labelCls = 'mb-1 block text-xs font-semibold text-slate-500 dark:text-slat
 export default function CreateReservationModal({ onClose, onSubmit }) {
   const { theme } = useTenantBranding()
   const today = todayLocalDateString()
-  const [form, setForm] = useState({ customer: '', reservation_date: today, expiry_date: '', deposit_amount: '', notes: '' })
+  const [form, setForm] = useState({ customer: '', reservation_date: today, expiry_date: '', notes: '' })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
@@ -27,7 +27,6 @@ export default function CreateReservationModal({ onClose, onSubmit }) {
         customer: form.customer,
         reservation_date: form.reservation_date,
         expiry_date: form.expiry_date || null,
-        deposit_amount: form.deposit_amount || null,
         notes: form.notes || '',
       })
       onClose()
@@ -57,10 +56,6 @@ export default function CreateReservationModal({ onClose, onSubmit }) {
               <label className={labelCls}>Expiry Date</label>
               <input type="date" min={form.reservation_date || undefined} value={form.expiry_date} onChange={(e) => setForm((p) => ({ ...p, expiry_date: e.target.value }))} className={inputCls} />
             </div>
-          </div>
-          <div>
-            <label className={labelCls}>Deposit Amount</label>
-            <input type="number" min="0" step="0.01" value={form.deposit_amount} onChange={(e) => setForm((p) => ({ ...p, deposit_amount: e.target.value }))} className={inputCls} />
           </div>
           <div>
             <label className={labelCls}>Notes</label>
