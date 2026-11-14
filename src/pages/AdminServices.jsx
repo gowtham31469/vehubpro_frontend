@@ -11,6 +11,7 @@ import {
   deleteServiceItem,
   deleteServiceCategoryImage,
   deleteServiceItemImage,
+  fetchLabourCategories,
   fetchServiceCategories,
   fetchServiceItems,
   updateServiceCategory,
@@ -30,7 +31,7 @@ const PRICE_TYPE_OPTIONS = [
   { value: 'inclusive', label: 'Inclusive of GST', hint: 'Base price already includes GST.' },
 ]
 
-const emptyItem = { category: '', name: '', description: '', service_type: '', base_price: '', hsn_code: '', gst_percentage: '', price_type: 'exclusive', applicable_vehicle_types: [], is_active: true, is_featured: false }
+const emptyItem = { category: '', name: '', description: '', service_type: '', labour_category: '', base_price: '', hsn_code: '', gst_percentage: '', price_type: 'exclusive', applicable_vehicle_types: [], is_active: true, is_featured: false }
 
 export default function AdminServices() {
   const { theme } = useTenantBranding()
@@ -119,11 +120,24 @@ export default function AdminServices() {
     }
   }, [])
 
+  const [lcAll, setLcAll] = useState([])
+  const loadAllLabourCategories = useCallback(async () => {
+    try {
+      const data = await fetchLabourCategories({ pageSize: 'all', isActive: true })
+      setLcAll(data.results || [])
+    } catch {
+      setLcAll([])
+    }
+  }, [])
+
   useEffect(() => { loadCategories(1) }, [loadCategories])
 
   useEffect(() => {
-    if (tab === 'items') loadAllCategories()
-  }, [tab, loadAllCategories])
+    if (tab === 'items') {
+      loadAllCategories()
+      loadAllLabourCategories()
+    }
+  }, [tab, loadAllCategories, loadAllLabourCategories])
 
   // Search runs server-side across every category (see loadCategories), not just this page.
   const filteredCategories = catData.results || []
@@ -254,12 +268,15 @@ export default function AdminServices() {
 
   const [isCatFilterDropdownOpen, setIsCatFilterDropdownOpen] = useState(false)
   const [isCatModalDropdownOpen, setIsCatModalDropdownOpen] = useState(false)
+  const [isLcModalDropdownOpen, setIsLcModalDropdownOpen] = useState(false)
   const [isVtItemDropdownOpen, setIsVtItemDropdownOpen] = useState(false)
   const catFilterDropdownRef = useRef(null)
   const catModalDropdownRef = useRef(null)
+  const lcModalDropdownRef = useRef(null)
   const vtItemDropdownRef = useRef(null)
   const [catFilterQuery, setCatFilterQuery] = useState('')
   const [catModalQuery, setCatModalQuery] = useState('')
+  const [lcModalQuery, setLcModalQuery] = useState('')
   const [vtItemQuery, setVtItemQuery] = useState('')
 
   useEffect(() => {
@@ -292,6 +309,13 @@ export default function AdminServices() {
     return sortedCategories.filter((c) => c.name?.toLowerCase().includes(q))
   }, [sortedCategories, catModalQuery])
 
+  // Already ordered by (sort_order, name) server-side — no client re-sort needed.
+  const lcModalOptions = useMemo(() => {
+    const q = lcModalQuery.trim().toLowerCase()
+    if (!q) return lcAll
+    return lcAll.filter((c) => c.name?.toLowerCase().includes(q))
+  }, [lcAll, lcModalQuery])
+
   useEffect(() => {
     if (!isCatFilterDropdownOpen) setCatFilterQuery('')
   }, [isCatFilterDropdownOpen])
@@ -299,6 +323,10 @@ export default function AdminServices() {
   useEffect(() => {
     if (!isCatModalDropdownOpen) setCatModalQuery('')
   }, [isCatModalDropdownOpen])
+
+  useEffect(() => {
+    if (!isLcModalDropdownOpen) setLcModalQuery('')
+  }, [isLcModalDropdownOpen])
 
   const selectedFilterCat = useMemo(
     () => catAll.find((c) => String(c.id) === String(itemCatFilter)),
@@ -310,16 +338,22 @@ export default function AdminServices() {
     [catAll, itemForm.category],
   )
 
+  const selectedModalLc = useMemo(
+    () => lcAll.find((c) => String(c.id) === String(itemForm.labour_category)),
+    [lcAll, itemForm.labour_category],
+  )
+
   useEffect(() => {
-    if (!isCatFilterDropdownOpen && !isCatModalDropdownOpen && !isVtItemDropdownOpen) return undefined
+    if (!isCatFilterDropdownOpen && !isCatModalDropdownOpen && !isLcModalDropdownOpen && !isVtItemDropdownOpen) return undefined
     const handlePointerDown = (event) => {
       if (catFilterDropdownRef.current && !catFilterDropdownRef.current.contains(event.target)) setIsCatFilterDropdownOpen(false)
       if (catModalDropdownRef.current && !catModalDropdownRef.current.contains(event.target)) setIsCatModalDropdownOpen(false)
+      if (lcModalDropdownRef.current && !lcModalDropdownRef.current.contains(event.target)) setIsLcModalDropdownOpen(false)
       if (vtItemDropdownRef.current && !vtItemDropdownRef.current.contains(event.target)) setIsVtItemDropdownOpen(false)
     }
     document.addEventListener('mousedown', handlePointerDown)
     return () => document.removeEventListener('mousedown', handlePointerDown)
-  }, [isCatFilterDropdownOpen, isCatModalDropdownOpen, isVtItemDropdownOpen])
+  }, [isCatFilterDropdownOpen, isCatModalDropdownOpen, isLcModalDropdownOpen, isVtItemDropdownOpen])
 
   const loadItems = useCallback(
     async (page = 1) => {
@@ -355,6 +389,7 @@ export default function AdminServices() {
   const closeAllItemDropdowns = () => {
     setIsCatFilterDropdownOpen(false)
     setIsCatModalDropdownOpen(false)
+    setIsLcModalDropdownOpen(false)
     setIsVtItemDropdownOpen(false)
   }
 
@@ -368,6 +403,12 @@ export default function AdminServices() {
         list = data.results || []
         setCatAll(list)
       } catch { list = [] }
+    }
+    if (!lcAll.length) {
+      try {
+        const data = await fetchLabourCategories({ pageSize: 'all', isActive: true })
+        setLcAll(data.results || [])
+      } catch { /* leave lcAll empty — the field just shows no options */ }
     }
     setItemForm({ ...emptyItem })
     setItemImageFile(null)
@@ -385,6 +426,7 @@ export default function AdminServices() {
       name: item.name || '',
       description: item.description || '',
       service_type: item.service_type || '',
+      labour_category: item.labour_category ? String(item.labour_category) : '',
       base_price: item.base_price ?? '',
       hsn_code: item.hsn_code || '',
       gst_percentage: item.gst_percentage ?? '',
@@ -426,6 +468,7 @@ export default function AdminServices() {
         name,
         description: itemForm.description.trim(),
         service_type: itemForm.service_type,
+        labour_category: itemForm.labour_category || null,
         base_price: String(itemForm.base_price),
         hsn_code: itemForm.hsn_code.trim(),
         gst_percentage: String(itemForm.gst_percentage || 0),
@@ -965,7 +1008,7 @@ export default function AdminServices() {
                 <div className="relative" ref={catModalDropdownRef}>
                   <button
                     type="button"
-                    onClick={() => { setItemModalError(''); setIsVtItemDropdownOpen(false); setIsCatModalDropdownOpen((prev) => !prev) }}
+                    onClick={() => { setItemModalError(''); setIsVtItemDropdownOpen(false); setIsLcModalDropdownOpen(false); setIsCatModalDropdownOpen((prev) => !prev) }}
                     className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 px-3 py-2.5 pr-9 text-left text-sm font-medium text-slate-700 dark:text-slate-200 outline-none transition hover:border-slate-300 dark:hover:border-slate-600"
                   >
                     {selectedModalCat?.name || 'Select category'}
@@ -1045,6 +1088,70 @@ export default function AdminServices() {
                     )
                   })}
                 </div>
+              </div>
+
+              {/* Labour category (optional) */}
+              <div>
+                <label className="mb-1 block text-xs font-semibold text-slate-500 dark:text-slate-400">
+                  Labour Category <span className="text-slate-400">(optional)</span>
+                </label>
+                <div className="relative" ref={lcModalDropdownRef}>
+                  <button
+                    type="button"
+                    onClick={() => { setItemModalError(''); setIsCatModalDropdownOpen(false); setIsVtItemDropdownOpen(false); setIsLcModalDropdownOpen((prev) => !prev) }}
+                    className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 px-3 py-2.5 pr-9 text-left text-sm font-medium text-slate-700 dark:text-slate-200 outline-none transition hover:border-slate-300 dark:hover:border-slate-600"
+                  >
+                    {selectedModalLc?.name || 'None'}
+                  </button>
+                  <ChevronDown size={16} className={`pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 transition ${isLcModalDropdownOpen ? 'rotate-180' : ''}`} />
+                  {isLcModalDropdownOpen ? (
+                    <div className="absolute left-0 right-0 z-[60] mt-2 max-h-72 overflow-hidden rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-lg">
+                      <div className="sticky top-0 border-b border-slate-100 bg-white p-2 dark:border-slate-800 dark:bg-slate-900">
+                        <div className="relative">
+                          <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500" />
+                          <input
+                            autoFocus
+                            value={lcModalQuery}
+                            onChange={(e) => setLcModalQuery(e.target.value)}
+                            placeholder="Search labour categories..."
+                            className="w-full rounded-lg border border-slate-200 bg-slate-50 py-1.5 pl-8 pr-2 text-sm text-slate-700 outline-none focus:border-slate-400 dark:border-slate-700 dark:bg-slate-950/50 dark:text-slate-100 dark:placeholder:text-slate-600"
+                          />
+                        </div>
+                      </div>
+                      <div className="max-h-56 overflow-auto">
+                        <button
+                          type="button"
+                          onClick={() => { setItemForm((p) => ({ ...p, labour_category: '' })); setIsLcModalDropdownOpen(false) }}
+                          className={`flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm transition ${!itemForm.labour_category ? 'font-semibold' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
+                          style={!itemForm.labour_category ? { backgroundColor: theme.accentSoft, color: theme.accent } : undefined}
+                        >
+                          {!itemForm.labour_category ? <Check size={14} /> : <span className="w-[14px]" />}
+                          None
+                        </button>
+                        {lcModalOptions.length === 0 ? (
+                          <p className="px-3 py-3 text-xs text-slate-400 dark:text-slate-500">No labour categories match.</p>
+                        ) : (
+                          lcModalOptions.map((c) => {
+                            const sel = String(itemForm.labour_category) === String(c.id)
+                            return (
+                              <button
+                                key={c.id}
+                                type="button"
+                                onClick={() => { setItemForm((p) => ({ ...p, labour_category: String(c.id) })); setIsLcModalDropdownOpen(false) }}
+                                className={`flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm transition ${sel ? 'font-semibold' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
+                                style={sel ? { backgroundColor: theme.accentSoft, color: theme.accent } : undefined}
+                              >
+                                {sel ? <Check size={14} /> : <span className="w-[14px]" />}
+                                <span className="min-w-0 flex-1 truncate">{c.name}</span>
+                              </button>
+                            )
+                          })
+                        )}
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+                <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">Only relevant for labour-type items; leave as None for parts.</p>
               </div>
 
               {/* Name */}
@@ -1153,7 +1260,7 @@ export default function AdminServices() {
                   <div className="relative" ref={vtItemDropdownRef}>
                     <button
                       type="button"
-                      onClick={() => { setIsCatModalDropdownOpen(false); setIsVtItemDropdownOpen((prev) => !prev) }}
+                      onClick={() => { setIsCatModalDropdownOpen(false); setIsLcModalDropdownOpen(false); setIsVtItemDropdownOpen((prev) => !prev) }}
                       className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 px-3 py-2.5 pr-9 text-left text-sm font-medium text-slate-700 dark:text-slate-200 outline-none transition hover:border-slate-300 dark:hover:border-slate-600"
                     >
                       <span className="block truncate">

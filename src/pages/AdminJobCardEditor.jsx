@@ -668,7 +668,7 @@ export default function AdminJobCardEditor() {
   const serviceDropdownRef = useRef(null)
 
   const preview = useMemo(() => computePreview(form, serviceItems), [form, serviceItems])
-  const isLocked = form.status === 'invoiced'
+  const isLocked = form.status === 'invoiced' || form.status === 'delivered'
 
   const rowAmount = (row) => {
     const gross = Math.max(
@@ -1427,7 +1427,11 @@ export default function AdminJobCardEditor() {
               <Lock size={18} className="shrink-0 text-amber-600" />
               <div>
                 <p className="font-bold">This job card is locked</p>
-                <p className="text-xs opacity-90">Invoiced job cards cannot be edited. Generate a new job card for additional work.</p>
+                <p className="text-xs opacity-90">
+                  {form.status === 'delivered'
+                    ? 'Delivered job cards cannot be edited. Generate a new job card for additional work.'
+                    : 'Invoiced job cards cannot be edited. Generate a new job card for additional work.'}
+                </p>
               </div>
             </div>
           )}

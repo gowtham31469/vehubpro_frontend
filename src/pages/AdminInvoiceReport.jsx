@@ -50,6 +50,24 @@ function formatDate(iso) {
 const emptyFilters = { dateFrom: '', dateTo: '', paymentStatus: '', invoiceType: '' }
 const emptyPageData = { count: 0, next: null, previous: null, results: [] }
 
+// Tenants start with these three (seeded on signup) but LabourCategory is
+// tenant-curated, so anything outside this list still renders — just sorted
+// after the known ones, alphabetically, with "Uncategorized" always last.
+const LABOUR_CATEGORY_ORDER = ['Periodic Maintenance', 'General Repair', 'Painting']
+
+function sortLabourBreakdown(rows) {
+  return [...(rows || [])].sort((a, b) => {
+    if (a.name === 'Uncategorized') return 1
+    if (b.name === 'Uncategorized') return -1
+    const ai = LABOUR_CATEGORY_ORDER.indexOf(a.name)
+    const bi = LABOUR_CATEGORY_ORDER.indexOf(b.name)
+    if (ai === -1 && bi === -1) return a.name.localeCompare(b.name)
+    if (ai === -1) return 1
+    if (bi === -1) return -1
+    return ai - bi
+  })
+}
+
 function KpiCard({ icon: Icon, label, value, accent, accentSoft }) {
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800/60 dark:bg-slate-900/40">
@@ -227,10 +245,12 @@ export default function AdminInvoiceReport() {
           <>
             {/* KPI summary — computed in the database, so this stays accurate and fast
                 even when the matching row count is far larger than what's shown below. */}
-            <div className="grid grid-cols-2 gap-4 lg:grid-cols-3 xl:grid-cols-6">
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
               <KpiCard icon={ReceiptText} label="Invoices" value={summary.count.toLocaleString('en-IN')} accent={theme.accent} accentSoft={theme.accentSoft} />
               <KpiCard icon={Banknote} label="Total Invoiced" value={fmtMoney(summary.total_invoiced)} accent={theme.accent} accentSoft={theme.accentSoft} />
-              <KpiCard icon={Wrench} label="Labour Amount" value={fmtMoney(summary.total_labour)} accent="#7c3aed" accentSoft="rgba(124,58,237,0.12)" />
+              {sortLabourBreakdown(summary.labour_breakdown).map((row) => (
+                <KpiCard key={row.name} icon={Wrench} label={row.name} value={fmtMoney(row.amount)} accent="#7c3aed" accentSoft="rgba(124,58,237,0.12)" />
+              ))}
               <KpiCard icon={Package} label="Parts Amount" value={fmtMoney(summary.total_parts)} accent="#0891b2" accentSoft="rgba(8,145,178,0.12)" />
               <KpiCard icon={Wallet} label="Total Collected" value={fmtMoney(summary.total_collected)} accent="#059669" accentSoft="rgba(5,150,105,0.12)" />
               <KpiCard icon={FileWarning} label="Outstanding" value={fmtMoney(summary.total_outstanding)} accent="#e11d48" accentSoft="rgba(225,29,72,0.12)" />

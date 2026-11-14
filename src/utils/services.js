@@ -67,6 +67,18 @@ export async function deleteServiceCategoryImage(id) {
   )
 }
 
+/** Labour Categories */
+export async function fetchLabourCategories({ page = 1, pageSize = 10, isArchived = false, isActive, search = '' } = {}) {
+  const params = new URLSearchParams({
+    page: String(page),
+    page_size: String(pageSize),
+    is_archive: String(Boolean(isArchived)),
+  })
+  if (isActive !== undefined) params.set('is_active', String(Boolean(isActive)))
+  if (search.trim()) params.set('search', search.trim())
+  return parseResponse(`/api/v1/services/labour-categories/?${params.toString()}`, { method: 'GET' }, 'Failed to fetch labour categories.')
+}
+
 export async function fetchServiceItems({ page = 1, pageSize = 10, categoryId, isArchived = false, isActive, search = '' } = {}) {
   const params = new URLSearchParams({
     page: String(page),
