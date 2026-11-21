@@ -1,6 +1,7 @@
 /* eslint-disable react-refresh/only-export-components -- hook + provider pattern */
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import { DEFAULT_BRANDING, fetchBrandingByToken, fetchPublicTenantBranding, getStoredBranding, getSubdomain } from '../utils/branding'
+import { safeGetItem, safeSetItem } from '../utils/safeStorage'
 import { hexToRgba } from '../utils/themeColors'
 
 const TenantBrandingContext = createContext(null)
@@ -11,7 +12,7 @@ export function TenantBrandingProvider({ children }) {
   const [tenantError, setTenantError] = useState(null)
   const [tenantErrorCode, setTenantErrorCode] = useState(null)
 
-  const [themeMode, setThemeModeState] = useState(() => localStorage.getItem('theme_mode') || 'system')
+  const [themeMode, setThemeModeState] = useState(() => safeGetItem('theme_mode') || 'system')
 
   useEffect(() => {
     const root = document.documentElement
@@ -34,7 +35,7 @@ export function TenantBrandingProvider({ children }) {
   }, [themeMode])
 
   const setThemeMode = useCallback((newMode) => {
-    localStorage.setItem('theme_mode', newMode)
+    safeSetItem('theme_mode', newMode)
     setThemeModeState(newMode)
   }, [])
 
@@ -69,7 +70,7 @@ export function TenantBrandingProvider({ children }) {
   }, [subdomain])
 
   const refresh = useCallback(async (signal) => {
-    const token = localStorage.getItem('access_token')
+    const token = safeGetItem('access_token')
     if (!token) return
     const data = await fetchBrandingByToken(signal)
     setBranding(data)

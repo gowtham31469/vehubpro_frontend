@@ -1,4 +1,5 @@
 import { apiFetch, unwrapData } from './apiClient'
+import { safeGetItem, safeSetItem } from './safeStorage'
 
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '')
 const BRANDING_STORAGE_KEY = 'tenant_branding'
@@ -20,7 +21,7 @@ export function getSubdomain() {
 
 export function getStoredBranding() {
   try {
-    const raw = localStorage.getItem(BRANDING_STORAGE_KEY)
+    const raw = safeGetItem(BRANDING_STORAGE_KEY)
     if (!raw) return DEFAULT_BRANDING
     const parsed = JSON.parse(raw)
     return {
@@ -37,7 +38,7 @@ export function saveBranding(branding) {
     ...DEFAULT_BRANDING,
     ...(branding || {}),
   }
-  localStorage.setItem(BRANDING_STORAGE_KEY, JSON.stringify(normalized))
+  safeSetItem(BRANDING_STORAGE_KEY, JSON.stringify(normalized))
   return normalized
 }
 

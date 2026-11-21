@@ -8,6 +8,7 @@ import ReactDOM from 'react-dom'
 import { useTenantBranding } from '../context/TenantBrandingContext.jsx'
 import { clearSession, getCurrentUser } from '../utils/apiClient'
 import { fetchUserNavModules } from '../utils/modules.js'
+import { safeGetItem, safeSetItem } from '../utils/safeStorage'
 import NotificationBell from './NotificationBell.jsx'
 import { useState, useRef, useEffect } from 'react'
 
@@ -100,6 +101,7 @@ const SUBMODULE_ROUTE_MAP = {
   'portfolio_insights':  '/admin/portfolio',
   'inventory_vehicles':  '/admin/portfolio/inventory',
   'inventory-vehicles':  '/admin/portfolio/inventory',
+  'leads':               '/admin/portfolio/leads',
   'visit_requests':      '/admin/portfolio/visit-requests',
   'visit-requests':      '/admin/portfolio/visit-requests',
   'portfolio_reports':   '/admin/portfolio/reports',
@@ -379,7 +381,7 @@ export default function AdminShell({ children }) {
   const [profileOpen, setProfileOpen] = useState(false)
   const [profilePos, setProfilePos] = useState({ top: 0, right: 0 })
   const [collapsed, setCollapsed] = useState(
-    () => localStorage.getItem(SIDEBAR_KEY) === '1'
+    () => safeGetItem(SIDEBAR_KEY) === '1'
   )
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const [navModules, setNavModules] = useState(() => getCachedNav() || FALLBACK_NAV)
@@ -390,7 +392,7 @@ export default function AdminShell({ children }) {
   const toggleSidebar = () => {
     setCollapsed((prev) => {
       const next = !prev
-      localStorage.setItem(SIDEBAR_KEY, next ? '1' : '0')
+      safeSetItem(SIDEBAR_KEY, next ? '1' : '0')
       return next
     })
   }

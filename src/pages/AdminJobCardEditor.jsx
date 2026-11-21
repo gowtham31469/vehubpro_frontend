@@ -407,12 +407,12 @@ function readRecentIds() {
 function pushRecentId(id) {
   const cur = readRecentIds().filter((x) => x !== id)
   cur.unshift(id)
-  sessionStorage.setItem(RECENT_KEY, JSON.stringify(cur.slice(0, 8)))
+  try { sessionStorage.setItem(RECENT_KEY, JSON.stringify(cur.slice(0, 8))) } catch { /* storage unavailable — non-critical */ }
 }
 
 function removeRecentId(id) {
   const cur = readRecentIds().filter((x) => String(x) !== String(id))
-  sessionStorage.setItem(RECENT_KEY, JSON.stringify(cur))
+  try { sessionStorage.setItem(RECENT_KEY, JSON.stringify(cur)) } catch { /* storage unavailable — non-critical */ }
 }
 
 const INVOICE_TYPE_OPTIONS = [

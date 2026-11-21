@@ -1,9 +1,11 @@
+import { safeGetItem, safeRemoveItem, safeSessionRemoveItem, safeSetItem } from './safeStorage'
+
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '')
 
 let refreshPromise = null
 
 function getAccessToken() {
-  return localStorage.getItem('access_token')
+  return safeGetItem('access_token')
 }
 
 export function isAuthenticated() {
@@ -11,25 +13,25 @@ export function isAuthenticated() {
 }
 
 function getRefreshToken() {
-  return localStorage.getItem('refresh_token')
+  return safeGetItem('refresh_token')
 }
 
 function setTokens({ access, refresh }) {
-  if (access) localStorage.setItem('access_token', access)
-  if (refresh) localStorage.setItem('refresh_token', refresh)
+  if (access) safeSetItem('access_token', access)
+  if (refresh) safeSetItem('refresh_token', refresh)
 }
 
 export function clearSession() {
-  localStorage.removeItem('access_token')
-  localStorage.removeItem('refresh_token')
-  localStorage.removeItem('current_user')
+  safeRemoveItem('access_token')
+  safeRemoveItem('refresh_token')
+  safeRemoveItem('current_user')
   // Must match AdminShell.jsx's NAV_CACHE_KEY — otherwise the next login in
   // this tab reuses the previous session's sidebar instead of refetching it.
-  sessionStorage.removeItem('vehubpro_nav_modules')
+  safeSessionRemoveItem('vehubpro_nav_modules')
 }
 
 export function getCurrentUser() {
-  const raw = localStorage.getItem('current_user')
+  const raw = safeGetItem('current_user')
   if (!raw) return null
   try {
     return JSON.parse(raw)
@@ -40,9 +42,9 @@ export function getCurrentUser() {
 
 export function setCurrentUser(user) {
   if (user) {
-    localStorage.setItem('current_user', JSON.stringify(user))
+    safeSetItem('current_user', JSON.stringify(user))
   } else {
-    localStorage.removeItem('current_user')
+    safeRemoveItem('current_user')
   }
 }
 

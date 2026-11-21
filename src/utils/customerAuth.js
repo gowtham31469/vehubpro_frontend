@@ -2,6 +2,8 @@
 // utils/apiClient.js's staff session (access_token/refresh_token/current_user)
 // so a customer and a logged-in staff member can coexist in the same browser
 // without clobbering each other's session.
+import { safeGetItem, safeRemoveItem, safeSetItem } from './safeStorage'
+
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '')
 
 function extractError(payload, fallback) {
@@ -33,17 +35,17 @@ async function post(path, body) {
 }
 
 function storeSession({ access, refresh, user }) {
-  if (access) localStorage.setItem('customer_access_token', access)
-  if (refresh) localStorage.setItem('customer_refresh_token', refresh)
-  if (user) localStorage.setItem('customer_user', JSON.stringify(user))
+  if (access) safeSetItem('customer_access_token', access)
+  if (refresh) safeSetItem('customer_refresh_token', refresh)
+  if (user) safeSetItem('customer_user', JSON.stringify(user))
 }
 
 function getAccessToken() {
-  return localStorage.getItem('customer_access_token')
+  return safeGetItem('customer_access_token')
 }
 
 function getRefreshToken() {
-  return localStorage.getItem('customer_refresh_token')
+  return safeGetItem('customer_refresh_token')
 }
 
 let refreshPromise = null
@@ -65,8 +67,8 @@ async function refreshAccessToken() {
     const data = payload?.data || payload || {}
     if (!response.ok || !data?.access) throw new Error('SESSION_EXPIRED')
 
-    localStorage.setItem('customer_access_token', data.access)
-    if (data.refresh) localStorage.setItem('customer_refresh_token', data.refresh)
+    safeSetItem('customer_access_token', data.access)
+    if (data.refresh) safeSetItem('customer_refresh_token', data.refresh)
     return data.access
   })()
 
@@ -123,19 +125,19 @@ export async function loginCustomer(subdomain, { email, password }) {
 }
 
 export function isCustomerAuthenticated() {
-  return Boolean(localStorage.getItem('customer_access_token'))
+  return Boolean(safeGetItem('customer_access_token'))
 }
 
 export function getCustomerUser() {
-  const raw = localStorage.getItem('customer_user')
+  const raw = safeGetItem('customer_user')
   if (!raw) return null
   try { return JSON.parse(raw) } catch { return null }
 }
 
 export function logoutCustomer() {
-  localStorage.removeItem('customer_access_token')
-  localStorage.removeItem('customer_refresh_token')
-  localStorage.removeItem('customer_user')
+  safeRemoveItem('customer_access_token')
+  safeRemoveItem('customer_refresh_token')
+  safeRemoveItem('customer_user')
 }
 
 export async function getProfile() {
@@ -150,7 +152,7 @@ export async function updateProfile(fullName) {
   // Keep the header's cached user in sync so the avatar/name update immediately.
   const current = getCustomerUser()
   if (current) {
-    localStorage.setItem('customer_user', JSON.stringify({ ...current, full_name: data.full_name }))
+    safeSetItem('customer_user', JSON.stringify({ ...current, full_name: data.full_name }))
   }
   return data
 }

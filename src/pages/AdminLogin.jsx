@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { saveBranding } from '../utils/branding'
 import { isAuthenticated, setCurrentUser } from '../utils/apiClient'
+import { safeSetItem } from '../utils/safeStorage'
 import { useTenantBranding } from '../context/TenantBrandingContext.jsx'
 import loginSideImage from '../assets/images/logan-meis-7qLT-Msda1k-unsplash.jpg'
 
@@ -107,8 +108,8 @@ export default function AdminLogin() {
         return
       }
 
-      localStorage.setItem('access_token', accessToken)
-      if (refreshToken) localStorage.setItem('refresh_token', refreshToken)
+      safeSetItem('access_token', accessToken)
+      if (refreshToken) safeSetItem('refresh_token', refreshToken)
       if (data?.user) setCurrentUser(data.user)
 
       try {

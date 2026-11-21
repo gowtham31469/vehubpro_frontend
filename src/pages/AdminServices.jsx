@@ -426,7 +426,11 @@ export default function AdminServices() {
       name: item.name || '',
       description: item.description || '',
       service_type: item.service_type || '',
-      labour_category: item.labour_category ? String(item.labour_category) : '',
+      // Normalize on load: a part should never carry a labour category into
+      // the form, even if the stored record has one (e.g. from before this
+      // field was gated by Service Type) — otherwise re-saving the item
+      // unchanged would resend a stale labour_category the backend now rejects.
+      labour_category: item.service_type === 'labour' && item.labour_category ? String(item.labour_category) : '',
       base_price: item.base_price ?? '',
       hsn_code: item.hsn_code || '',
       gst_percentage: item.gst_percentage ?? '',
@@ -1075,7 +1079,7 @@ export default function AdminServices() {
                       <button
                         key={opt.value}
                         type="button"
-                        onClick={() => { setItemModalError(''); setItemForm((p) => ({ ...p, service_type: opt.value })) }}
+                        onClick={() => { setItemModalError(''); setItemForm((p) => ({ ...p, service_type: opt.value, labour_category: opt.value === 'labour' ? p.labour_category : '' })) }}
                         className={`rounded-xl border px-3 py-2.5 text-sm font-semibold transition ${
                           sel
                             ? 'border-transparent text-white'
@@ -1090,7 +1094,12 @@ export default function AdminServices() {
                 </div>
               </div>
 
-              {/* Labour category (optional) */}
+              {/* Labour category (optional) — only meaningful for labour-type
+                  items, so it's hidden for parts rather than shown-but-inert;
+                  switching Service Type away from Labour also clears
+                  whatever was picked here (see the Service Type onClick
+                  above), so a part can never carry a stale labour category. */}
+              {itemForm.service_type === 'labour' ? (
               <div>
                 <label className="mb-1 block text-xs font-semibold text-slate-500 dark:text-slate-400">
                   Labour Category <span className="text-slate-400">(optional)</span>
@@ -1153,6 +1162,7 @@ export default function AdminServices() {
                 </div>
                 <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">Only relevant for labour-type items; leave as None for parts.</p>
               </div>
+              ) : null}
 
               {/* Name */}
               <div>

@@ -26,6 +26,7 @@ import AdminInventoryVehicles from './pages/AdminInventoryVehicles'
 import AdminInventoryVehicleForm from './pages/AdminInventoryVehicleForm'
 import AdminVehicleDetail from './pages/AdminVehicleDetail'
 import AdminVisitRequests from './pages/AdminVisitRequests'
+import AdminLeads from './pages/AdminLeads'
 import PublicHome from './pages/PublicHome'
 import PublicInventoryListing from './pages/PublicInventoryListing'
 import PublicServicesListing from './pages/PublicServicesListing'
@@ -68,6 +69,7 @@ export default function App() {
         <Route path="/admin/portfolio/inventory/:id/edit" element={<AdminInventoryVehicleForm />} />
         <Route path="/admin/portfolio/inventory/:id" element={<AdminVehicleDetail />} />
         <Route path="/admin/portfolio/visit-requests" element={<AdminVisitRequests />} />
+        <Route path="/admin/portfolio/leads" element={<AdminLeads />} />
         <Route path="/admin/dashboard" element={<AdminDashboard />} />
         <Route path="/admin/customers" element={<AdminCustomers />} />
         <Route path="/admin/service-vehicles" element={<AdminServiceVehicles />} />

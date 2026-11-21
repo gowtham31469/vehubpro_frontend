@@ -789,7 +789,7 @@ export default function AdminInventoryVehicleForm() {
                     <button
                       type="button"
                       onClick={() => removeExistingPhoto(p.key)}
-                      className="absolute right-1 top-1 rounded-full bg-slate-900/70 p-1 text-white opacity-0 transition group-hover:opacity-100"
+                      className="absolute right-1 top-1 rounded-full bg-slate-900/70 p-1.5 text-white transition sm:p-1 sm:opacity-0 sm:group-hover:opacity-100"
                       aria-label="Remove photo"
                     >
                       <X size={12} />
@@ -802,7 +802,7 @@ export default function AdminInventoryVehicleForm() {
                     <button
                       type="button"
                       onClick={() => removeNewFile(idx)}
-                      className="absolute right-1 top-1 rounded-full bg-slate-900/70 p-1 text-white opacity-0 transition group-hover:opacity-100"
+                      className="absolute right-1 top-1 rounded-full bg-slate-900/70 p-1.5 text-white transition sm:p-1 sm:opacity-0 sm:group-hover:opacity-100"
                       aria-label="Remove photo"
                     >
                       <X size={12} />
@@ -820,18 +820,18 @@ export default function AdminInventoryVehicleForm() {
             ) : null}
           </SectionCard>
 
-          <div className="flex justify-end gap-3 pb-8">
+          <div className="flex flex-col-reverse gap-3 pb-8 sm:flex-row sm:justify-end">
             <button
               type="button"
               onClick={() => navigate('/admin/portfolio/inventory')}
-              className="rounded-xl px-5 py-2.5 text-sm font-semibold text-slate-600 dark:text-slate-400"
+              className="w-full rounded-xl px-5 py-2.5 text-sm font-semibold text-slate-600 dark:text-slate-400 sm:w-auto"
             >
               Discard Draft
             </button>
             <button
               type="submit"
               disabled={saving}
-              className="rounded-xl px-6 py-2.5 text-sm font-semibold text-white shadow disabled:opacity-60"
+              className="w-full rounded-xl px-6 py-2.5 text-sm font-semibold text-white shadow disabled:opacity-60 sm:w-auto"
               style={{ backgroundColor: theme.accent }}
             >
               {saving ? 'Saving...' : isEdit ? 'Save Changes' : 'Publish Listing'}

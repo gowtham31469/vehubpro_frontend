@@ -248,8 +248,9 @@ export default function AdminInvoiceReport() {
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
               <KpiCard icon={ReceiptText} label="Invoices" value={summary.count.toLocaleString('en-IN')} accent={theme.accent} accentSoft={theme.accentSoft} />
               <KpiCard icon={Banknote} label="Total Invoiced" value={fmtMoney(summary.total_invoiced)} accent={theme.accent} accentSoft={theme.accentSoft} />
+              <KpiCard icon={Wrench} label="Labour Amount" value={fmtMoney(summary.total_labour)} accent="#7c3aed" accentSoft="rgba(124,58,237,0.12)" />
               {sortLabourBreakdown(summary.labour_breakdown).map((row) => (
-                <KpiCard key={row.name} icon={Wrench} label={row.name} value={fmtMoney(row.amount)} accent="#7c3aed" accentSoft="rgba(124,58,237,0.12)" />
+                <KpiCard key={row.name} icon={Wrench} label={row.name} value={fmtMoney(row.amount)} accent="#a855f7" accentSoft="rgba(168,85,247,0.12)" />
               ))}
               <KpiCard icon={Package} label="Parts Amount" value={fmtMoney(summary.total_parts)} accent="#0891b2" accentSoft="rgba(8,145,178,0.12)" />
               <KpiCard icon={Wallet} label="Total Collected" value={fmtMoney(summary.total_collected)} accent="#059669" accentSoft="rgba(5,150,105,0.12)" />
