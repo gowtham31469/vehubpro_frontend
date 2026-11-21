@@ -51,6 +51,7 @@ function emptyForm(y0) {
     transmission: 'automatic',
     color: '',
     mileage_km: '',
+    no_of_owners: 1,
     key_features: [],
     listing_price: '',
     original_price: '',
@@ -75,6 +76,7 @@ function vehicleToForm(v, y0) {
     transmission: v.transmission || 'automatic',
     color: v.color || '',
     mileage_km: v.mileage_km ?? '',
+    no_of_owners: v.no_of_owners ?? 1,
     key_features: (v.key_features || []).map(String),
     listing_price: v.listing_price ?? '',
     original_price: v.original_price ?? '',
@@ -326,6 +328,7 @@ export default function AdminInventoryVehicleForm() {
       transmission: form.transmission,
       color: form.color,
       mileage_km: form.mileage_km === '' ? 0 : Number(form.mileage_km),
+      no_of_owners: form.no_of_owners === '' ? 1 : Number(form.no_of_owners),
       key_features: form.key_features,
       listing_price: form.listing_price === '' ? 0 : Number(form.listing_price),
       original_price: form.original_price === '' ? null : Number(form.original_price),
@@ -552,7 +555,7 @@ export default function AdminInventoryVehicleForm() {
           </SectionCard>
 
           <SectionCard step={2} title="Technical Specifications">
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-4">
               <div>
                 <label className={labelCls}>Fuel Type <span className="text-rose-500">*</span></label>
                 <SearchableSelect
@@ -600,6 +603,17 @@ export default function AdminInventoryVehicleForm() {
                   />
                   <span className="flex items-center border-l border-slate-200 px-3 text-sm font-semibold text-slate-500 dark:border-slate-800 dark:text-slate-400">km</span>
                 </div>
+              </div>
+              <div>
+                <label className={labelCls}>No. of Owners</label>
+                <input
+                  type="number"
+                  min="1"
+                  value={form.no_of_owners}
+                  onChange={(e) => setForm((p) => ({ ...p, no_of_owners: e.target.value }))}
+                  placeholder="1"
+                  className={inputCls}
+                />
               </div>
             </div>
 

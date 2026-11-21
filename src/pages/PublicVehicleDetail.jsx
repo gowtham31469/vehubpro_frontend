@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, Calendar, Car, Check, CheckCircle2, ChevronLeft, ChevronRight, Cog, Copy, Fuel, Gauge, Heart, Mail, Maximize2, Phone, Share2, ShieldCheck, Sparkles, X } from 'lucide-react'
+import { ArrowLeft, Calendar, Car, Check, CheckCircle2, ChevronLeft, ChevronRight, Cog, Copy, Fuel, Gauge, Heart, Mail, Maximize2, Phone, Share2, ShieldCheck, Sparkles, Users, X } from 'lucide-react'
 import { useTenantBranding } from '../context/TenantBrandingContext.jsx'
 import { useToast } from '../context/ToastContext.jsx'
 import { fetchPublicInventoryVehicleDetail } from '../utils/publicPortfolio'
@@ -254,7 +254,7 @@ export default function PublicVehicleDetail() {
 
       <div className="mx-auto max-w-[1240px] px-6 py-10">
         <Link to="/portfolio/inventory" className="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-500 transition hover:text-slate-900">
-          <ArrowLeft size={15} /> Back to inventory
+          <ArrowLeft size={15} /> Back to All Cars
         </Link>
 
         {loading ? (
@@ -498,7 +498,7 @@ export default function PublicVehicleDetail() {
                   <p className="mt-2 text-3xl font-extrabold" style={{ color: ACCENT }}>{fmtMoney(vehicle.listing_price)}</p>
                 )}
 
-                <div className="mt-6 grid grid-cols-2 gap-2 text-center text-xs text-slate-500">
+                <div className="mt-6 grid grid-cols-2 gap-2 text-center text-xs text-slate-500 sm:grid-cols-3">
                   <div className="flex flex-col items-center gap-1.5 rounded-xl bg-slate-50 py-3">
                     <Gauge size={16} />
                     {Number(vehicle.mileage_km || 0).toLocaleString('en-IN')} km
@@ -514,6 +514,10 @@ export default function PublicVehicleDetail() {
                   <div className="flex flex-col items-center gap-1.5 rounded-xl bg-slate-50 py-3">
                     <Car size={16} />
                     {vehicle.vehicle_type_name}
+                  </div>
+                  <div className="flex flex-col items-center gap-1.5 rounded-xl bg-slate-50 py-3">
+                    <Users size={16} />
+                    {vehicle.no_of_owners || 1} Owner{(vehicle.no_of_owners || 1) === 1 ? '' : 's'}
                   </div>
                 </div>
 

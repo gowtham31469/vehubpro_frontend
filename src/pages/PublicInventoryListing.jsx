@@ -317,7 +317,7 @@ export default function PublicInventoryListing() {
           }))
         }
       })
-      .catch((err) => { if (!cancelled) setLoadError(err.message || 'Could not load inventory.') })
+      .catch((err) => { if (!cancelled) setLoadError(err.message || 'Could not load All Cars.') })
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- ?brand= is only meant to seed the filter once, at initial load
@@ -699,7 +699,7 @@ export default function PublicInventoryListing() {
             </button>
 
             {loading ? (
-              <p className="py-16 text-center text-slate-400">Loading inventory…</p>
+              <p className="py-16 text-center text-slate-400">Loading All Cars…</p>
             ) : loadError ? (
               <p className="py-16 text-center text-rose-600">{loadError}</p>
             ) : filteredVehicles.length === 0 ? (
