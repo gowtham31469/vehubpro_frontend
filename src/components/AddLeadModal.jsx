@@ -251,7 +251,7 @@ export default function AddLeadModal({ onClose, onSubmit }) {
                   />
                 </div>
               </div>
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                 <div>
                   <label className={labelCls}>Year</label>
                   <input type="number" value={form.trade_in_year} onChange={(e) => setForm((p) => ({ ...p, trade_in_year: e.target.value }))} className={inputCls} placeholder="2019" />

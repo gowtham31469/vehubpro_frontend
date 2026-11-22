@@ -483,7 +483,7 @@ export default function AdminCustomers() {
               <>
                 <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm backdrop-blur-sm dark:border-slate-800/60 dark:bg-slate-900/40">
                   <div className="flex flex-wrap items-center gap-3">
-                    <div className="relative min-w-[250px] flex-1">
+                    <div className="relative w-full flex-1 sm:min-w-[250px]">
                       <Search size={17} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500" />
                       <input
                         value={searchText}

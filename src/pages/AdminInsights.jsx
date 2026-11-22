@@ -182,7 +182,7 @@ export default function AdminInsights() {
         </div>
 
         {/* ── Job card stats row ── */}
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
           {[
             { label: 'Active Jobs',          value: fmtCount(summary?.active_jobs),          icon: WalletCards },
             { label: 'Completed This Month', value: fmtCount(summary?.completed_this_month), icon: BadgeCheck },

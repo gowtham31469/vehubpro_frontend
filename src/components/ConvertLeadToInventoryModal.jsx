@@ -117,7 +117,7 @@ export default function ConvertLeadToInventoryModal({ lead, onClose, onSubmit })
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <div>
               <label className={labelCls}>Year *</label>
               <input type="number" value={year} onChange={(e) => setYear(e.target.value)} className={inputCls} />
