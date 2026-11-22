@@ -7,11 +7,13 @@ import {
   ChevronDown,
   CreditCard,
   Download,
+  FileMinus,
   History,
   Mail,
   X,
 } from 'lucide-react'
 import AdminShell from '../components/AdminShell'
+import IssueCreditNoteModal from '../components/IssueCreditNoteModal'
 import { useToast } from '../context/ToastContext.jsx'
 import { useTenantBranding } from '../context/TenantBrandingContext.jsx'
 import { cancelInvoice, fetchInvoicePreviewHtml, generateInvoicePdf, getInvoice, recordPayment } from '../utils/invoices'
@@ -241,6 +243,7 @@ export default function AdminInvoiceDetail() {
   const [paymentOpen, setPaymentOpen] = useState(false)
   const [historyOpen, setHistoryOpen] = useState(false)
   const [cancelOpen, setCancelOpen] = useState(false)
+  const [creditNoteOpen, setCreditNoteOpen] = useState(false)
   const [pdfLoading, setPdfLoading] = useState(false)
 
   // Download-time layout overrides — start Terms & Conditions / Our account
@@ -499,6 +502,16 @@ export default function AdminInvoiceDetail() {
                       <span>Cancel Invoice</span>
                     </button>
                   ) : null}
+                  {!isCancelled ? (
+                    <button
+                      type="button"
+                      onClick={() => setCreditNoteOpen(true)}
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900/50 px-3 py-2 text-sm font-semibold text-slate-700 dark:text-slate-300 shadow-sm transition hover:bg-slate-50 dark:hover:bg-slate-800"
+                    >
+                      <FileMinus size={16} />
+                      <span>Issue Credit Note</span>
+                    </button>
+                  ) : null}
                 </div>
 
                 {/* Record payment button or status */}
@@ -607,6 +620,19 @@ export default function AdminInvoiceDetail() {
           invoice={invoice}
           onClose={() => setCancelOpen(false)}
           onSuccess={() => { void load() }}
+        />
+      )}
+
+      {/* ── Issue credit note modal ── */}
+      {creditNoteOpen && (
+        <IssueCreditNoteModal
+          invoice={invoice}
+          onClose={() => setCreditNoteOpen(false)}
+          onSuccess={(creditNote) => {
+            void load()
+            showToast('success', `Credit note ${creditNote.credit_note_number} issued.`)
+            navigate(`/admin/credit-notes/${creditNote.id}`)
+          }}
         />
       )}
     </>

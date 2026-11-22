@@ -26,6 +26,18 @@ import {
   updateInventoryFeature,
 } from '../utils/inventoryVehicles'
 import { fetchUserNavModules } from '../utils/modules'
+import {
+  archiveReasonCategory,
+  createReasonCategory,
+  fetchReasonCategories,
+  updateReasonCategory,
+} from '../utils/creditNotes'
+import {
+  archiveVendorCategory,
+  createVendorCategory,
+  fetchVendorCategories,
+  updateVendorCategory,
+} from '../utils/vendors'
 
 // Same sessionStorage entry AdminShell.jsx populates (cleared on logout) and
 // the same split AdminDashboard.jsx uses — read-only here.
@@ -37,6 +49,8 @@ const SERVICE_MODULE_KEYS = new Set([
 const emptyBrand = { name: '', is_active: true, logo_url: null, logo_file: null }
 const emptyBodyType = { code: '', name: '', is_active: true }
 const emptyModel = { brand: '', vehicle_type: '', name: '', is_active: true }
+const emptyReasonCategory = { name: '', sort_order: 0, is_active: true }
+const emptyVendorCategory = { name: '', sort_order: 0, is_active: true }
 const emptyFeature = { name: '', category: 'comfort_convenience', is_active: true }
 // Mirrors InventoryFeature.CATEGORY_CHOICES in backend/apps/platform/portfolio/models.py.
 const FEATURE_CATEGORY_OPTIONS = [
@@ -90,16 +104,24 @@ export default function AdminConfiguration() {
 
   const hasServices = Boolean(moduleKeys?.some((k) => SERVICE_MODULE_KEYS.has(k)))
   const hasPortfolio = Boolean(moduleKeys?.includes('portfolio'))
+  // Strictly the "Services" module itself (not the broader services-suite
+  // superset above) — credit notes, and their reason categories, live under
+  // that specific module.
+  const hasServicesModule = Boolean(moduleKeys?.includes('services'))
+  const hasVendorModule = Boolean(moduleKeys?.includes('vendor'))
 
   // Brands/Models are shared master data used by both Service Vehicles and
   // Portfolio Inventory; Body Types/Key Features are Portfolio-only; Invoice
-  // Settings only matters to the Services side (invoices come from job cards).
+  // Settings and Reason Categories only matter to the Services module;
+  // Vendor Categories only matters to the Vendor module.
   const CONFIG_TABS = [
     { id: 'brands', label: 'Brands', visible: hasServices || hasPortfolio },
     { id: 'models', label: 'Models', visible: hasServices || hasPortfolio },
     { id: 'bodyTypes', label: 'Body Types', visible: hasPortfolio },
     { id: 'features', label: 'Key Features', visible: hasPortfolio },
     { id: 'invoice', label: 'Invoice Settings', visible: hasServices },
+    { id: 'reasonCategories', label: 'Reason Categories', visible: hasServicesModule },
+    { id: 'vendorCategories', label: 'Vendor Categories', visible: hasVendorModule },
   ]
   const visibleTabs = moduleKeys ? CONFIG_TABS.filter((t) => t.visible) : []
 
@@ -458,6 +480,206 @@ export default function AdminConfiguration() {
         return
       }
       showToast('error', err.message || 'Delete failed.')
+    }
+  }
+
+  /* Reason Categories (Services — Credit Note reason tagging) */
+  const [reasonCategoriesList, setReasonCategoriesList] = useState([])
+  const [reasonCategoriesLoading, setReasonCategoriesLoading] = useState(true)
+  const [reasonCategoriesError, setReasonCategoriesError] = useState('')
+  const [reasonCategorySearch, setReasonCategorySearch] = useState('')
+  const [reasonCategoryModal, setReasonCategoryModal] = useState(null)
+  const [reasonCategoryModalError, setReasonCategoryModalError] = useState('')
+  const [reasonCategoryForm, setReasonCategoryForm] = useState(emptyReasonCategory)
+  const [reasonCategorySaving, setReasonCategorySaving] = useState(false)
+  const [reasonCategoryDelete, setReasonCategoryDelete] = useState(null)
+
+  const loadReasonCategories = useCallback(async () => {
+    setReasonCategoriesLoading(true)
+    setReasonCategoriesError('')
+    try {
+      const data = await fetchReasonCategories()
+      setReasonCategoriesList(Array.isArray(data) ? data : [])
+    } catch (e) {
+      if (e.message === 'SESSION_EXPIRED') {
+        globalThis.location.href = '/admin'
+        return
+      }
+      setReasonCategoriesError(e.message)
+    } finally {
+      setReasonCategoriesLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (tab === 'reasonCategories') loadReasonCategories()
+  }, [tab, loadReasonCategories])
+
+  const filteredReasonCategories = useMemo(() => {
+    const q = reasonCategorySearch.trim().toLowerCase()
+    if (!q) return reasonCategoriesList
+    return reasonCategoriesList.filter((c) => c.name?.toLowerCase().includes(q))
+  }, [reasonCategoriesList, reasonCategorySearch])
+
+  const openReasonCategoryCreate = () => {
+    setReasonCategoryModalError('')
+    setReasonCategoryForm(emptyReasonCategory)
+    setReasonCategoryModal('create')
+  }
+  const openReasonCategoryEdit = (c) => {
+    setReasonCategoryModalError('')
+    setReasonCategoryForm({ name: c.name || '', sort_order: c.sort_order ?? 0, is_active: Boolean(c.is_active) })
+    setReasonCategoryModal({ type: 'edit', id: c.id })
+  }
+  const closeReasonCategoryModal = () => {
+    setReasonCategoryModalError('')
+    setReasonCategoryModal(null)
+  }
+
+  const saveReasonCategory = async (e) => {
+    e.preventDefault()
+    setReasonCategoryModalError('')
+    const name = reasonCategoryForm.name.trim()
+    if (!name) {
+      setReasonCategoryModalError('Name is required.')
+      return
+    }
+    setReasonCategorySaving(true)
+    try {
+      const payload = { name, sort_order: Number(reasonCategoryForm.sort_order) || 0, is_active: reasonCategoryForm.is_active }
+      if (reasonCategoryModal === 'create') {
+        await createReasonCategory(payload)
+        showToast('success', 'Reason category created.')
+      } else if (reasonCategoryModal?.type === 'edit') {
+        await updateReasonCategory(reasonCategoryModal.id, payload)
+        showToast('success', 'Reason category updated.')
+      }
+      closeReasonCategoryModal()
+      await loadReasonCategories()
+    } catch (err) {
+      if (err.message === 'SESSION_EXPIRED') {
+        globalThis.location.href = '/admin'
+        return
+      }
+      setReasonCategoryModalError(err.message || 'Save failed.')
+    } finally {
+      setReasonCategorySaving(false)
+    }
+  }
+
+  const confirmDeleteReasonCategory = async () => {
+    if (!reasonCategoryDelete?.id) return
+    try {
+      await archiveReasonCategory(reasonCategoryDelete.id)
+      showToast('success', 'Reason category archived.')
+      setReasonCategoryDelete(null)
+      await loadReasonCategories()
+    } catch (err) {
+      if (err.message === 'SESSION_EXPIRED') {
+        globalThis.location.href = '/admin'
+        return
+      }
+      showToast('error', err.message || 'Archive failed.')
+    }
+  }
+
+  /* Vendor Categories (Vendor module — Vendor master categorization) */
+  const [vendorCategoriesList, setVendorCategoriesList] = useState([])
+  const [vendorCategoriesLoading, setVendorCategoriesLoading] = useState(true)
+  const [vendorCategoriesError, setVendorCategoriesError] = useState('')
+  const [vendorCategorySearch, setVendorCategorySearch] = useState('')
+  const [vendorCategoryModal, setVendorCategoryModal] = useState(null)
+  const [vendorCategoryModalError, setVendorCategoryModalError] = useState('')
+  const [vendorCategoryForm, setVendorCategoryForm] = useState(emptyVendorCategory)
+  const [vendorCategorySaving, setVendorCategorySaving] = useState(false)
+  const [vendorCategoryDelete, setVendorCategoryDelete] = useState(null)
+
+  const loadVendorCategories = useCallback(async () => {
+    setVendorCategoriesLoading(true)
+    setVendorCategoriesError('')
+    try {
+      const data = await fetchVendorCategories()
+      setVendorCategoriesList(Array.isArray(data) ? data : [])
+    } catch (e) {
+      if (e.message === 'SESSION_EXPIRED') {
+        globalThis.location.href = '/admin'
+        return
+      }
+      setVendorCategoriesError(e.message)
+    } finally {
+      setVendorCategoriesLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (tab === 'vendorCategories') loadVendorCategories()
+  }, [tab, loadVendorCategories])
+
+  const filteredVendorCategories = useMemo(() => {
+    const q = vendorCategorySearch.trim().toLowerCase()
+    if (!q) return vendorCategoriesList
+    return vendorCategoriesList.filter((c) => c.name?.toLowerCase().includes(q))
+  }, [vendorCategoriesList, vendorCategorySearch])
+
+  const openVendorCategoryCreate = () => {
+    setVendorCategoryModalError('')
+    setVendorCategoryForm(emptyVendorCategory)
+    setVendorCategoryModal('create')
+  }
+  const openVendorCategoryEdit = (c) => {
+    setVendorCategoryModalError('')
+    setVendorCategoryForm({ name: c.name || '', sort_order: c.sort_order ?? 0, is_active: Boolean(c.is_active) })
+    setVendorCategoryModal({ type: 'edit', id: c.id })
+  }
+  const closeVendorCategoryModal = () => {
+    setVendorCategoryModalError('')
+    setVendorCategoryModal(null)
+  }
+
+  const saveVendorCategory = async (e) => {
+    e.preventDefault()
+    setVendorCategoryModalError('')
+    const name = vendorCategoryForm.name.trim()
+    if (!name) {
+      setVendorCategoryModalError('Name is required.')
+      return
+    }
+    setVendorCategorySaving(true)
+    try {
+      const payload = { name, sort_order: Number(vendorCategoryForm.sort_order) || 0, is_active: vendorCategoryForm.is_active }
+      if (vendorCategoryModal === 'create') {
+        await createVendorCategory(payload)
+        showToast('success', 'Vendor category created.')
+      } else if (vendorCategoryModal?.type === 'edit') {
+        await updateVendorCategory(vendorCategoryModal.id, payload)
+        showToast('success', 'Vendor category updated.')
+      }
+      closeVendorCategoryModal()
+      await loadVendorCategories()
+    } catch (err) {
+      if (err.message === 'SESSION_EXPIRED') {
+        globalThis.location.href = '/admin'
+        return
+      }
+      setVendorCategoryModalError(err.message || 'Save failed.')
+    } finally {
+      setVendorCategorySaving(false)
+    }
+  }
+
+  const confirmDeleteVendorCategory = async () => {
+    if (!vendorCategoryDelete?.id) return
+    try {
+      await archiveVendorCategory(vendorCategoryDelete.id)
+      showToast('success', 'Vendor category archived.')
+      setVendorCategoryDelete(null)
+      await loadVendorCategories()
+    } catch (err) {
+      if (err.message === 'SESSION_EXPIRED') {
+        globalThis.location.href = '/admin'
+        return
+      }
+      showToast('error', err.message || 'Archive failed.')
     }
   }
 
@@ -1138,6 +1360,152 @@ export default function AdminConfiguration() {
                 </div>
               </div>
             </div>
+          ) : tab === 'reasonCategories' ? (
+            <div className="space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="relative min-w-[220px] flex-1 max-w-md">
+                  <Search size={17} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500" />
+                  <input
+                    value={reasonCategorySearch}
+                    onChange={(e) => setReasonCategorySearch(e.target.value)}
+                    placeholder="Search reason categories..."
+                    className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-10 pr-3 text-sm text-slate-800 outline-none transition focus:border-slate-400 dark:border-slate-800 dark:bg-slate-950/50 dark:text-slate-100 dark:placeholder:text-slate-600 dark:focus:border-slate-700"
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={openReasonCategoryCreate}
+                  className="inline-flex items-center gap-2 rounded-xl px-5 py-3 text-sm font-semibold text-white shadow"
+                  style={{ backgroundColor: theme.accent }}
+                >
+                  <Plus size={18} /> Add reason category
+                </button>
+              </div>
+              <p className="text-sm text-slate-500 dark:text-slate-400">
+                The categories offered when issuing a Credit Note against an invoice (Pricing Error, Goodwill, etc.) — tenant-curated, shown in sort order.
+              </p>
+              {reasonCategoriesError ? <div className="rounded-xl border border-rose-200 dark:border-rose-900/50 bg-rose-50 dark:bg-rose-900/20 px-4 py-3 text-sm text-rose-800 dark:text-rose-400">{reasonCategoriesError}</div> : null}
+              <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm backdrop-blur-sm dark:border-slate-800/60 dark:bg-slate-900/40">
+                <div className="overflow-x-auto">
+                  <table className="min-w-full">
+                    <thead className="bg-slate-50 dark:bg-slate-800/50 text-left text-xs font-bold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">
+                      <tr>
+                        <th className="px-6 py-4">Name</th>
+                        <th className="px-6 py-4">Sort Order</th>
+                        <th className="px-6 py-4">Status</th>
+                        <th className="px-6 py-4 w-40">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-sm">
+                      {reasonCategoriesLoading ? (
+                        <tr>
+                          <td colSpan={4} className="px-6 py-8 text-slate-500 dark:text-slate-400">Loading…</td>
+                        </tr>
+                      ) : filteredReasonCategories.length === 0 ? (
+                        <tr>
+                          <td colSpan={4} className="px-6 py-8 text-slate-500 dark:text-slate-400">No reason categories found.</td>
+                        </tr>
+                      ) : (
+                        filteredReasonCategories.map((c) => (
+                          <tr key={c.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40">
+                            <td className="px-6 py-3 font-medium text-slate-900 dark:text-white">{c.name}</td>
+                            <td className="px-6 py-3 text-slate-500 dark:text-slate-400">{c.sort_order}</td>
+                            <td className="px-6 py-3">
+                              <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${c.is_active ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400' : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'}`}>
+                                {c.is_active ? 'Active' : 'Inactive'}
+                              </span>
+                            </td>
+                            <td className="px-6 py-3">
+                              <div className="flex gap-1 text-slate-500 dark:text-slate-400">
+                                <button type="button" className="rounded-lg p-2 hover:bg-slate-100 dark:hover:bg-slate-800" title="Edit" onClick={() => openReasonCategoryEdit(c)}>
+                                  <Pencil size={16} />
+                                </button>
+                                <button type="button" className="rounded-lg p-2 hover:bg-rose-50 dark:hover:bg-rose-900/20 text-rose-600" title="Archive" onClick={() => setReasonCategoryDelete(c)}>
+                                  <Trash2 size={16} />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          ) : tab === 'vendorCategories' ? (
+            <div className="space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="relative min-w-[220px] flex-1 max-w-md">
+                  <Search size={17} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500" />
+                  <input
+                    value={vendorCategorySearch}
+                    onChange={(e) => setVendorCategorySearch(e.target.value)}
+                    placeholder="Search vendor categories..."
+                    className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-10 pr-3 text-sm text-slate-800 outline-none transition focus:border-slate-400 dark:border-slate-800 dark:bg-slate-950/50 dark:text-slate-100 dark:placeholder:text-slate-600 dark:focus:border-slate-700"
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={openVendorCategoryCreate}
+                  className="inline-flex items-center gap-2 rounded-xl px-5 py-3 text-sm font-semibold text-white shadow"
+                  style={{ backgroundColor: theme.accent }}
+                >
+                  <Plus size={18} /> Add vendor category
+                </button>
+              </div>
+              <p className="text-sm text-slate-500 dark:text-slate-400">
+                The categories offered when adding a vendor (Parts Supplier, Contractor, etc.) — tenant-curated, shown in sort order.
+              </p>
+              {vendorCategoriesError ? <div className="rounded-xl border border-rose-200 dark:border-rose-900/50 bg-rose-50 dark:bg-rose-900/20 px-4 py-3 text-sm text-rose-800 dark:text-rose-400">{vendorCategoriesError}</div> : null}
+              <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm backdrop-blur-sm dark:border-slate-800/60 dark:bg-slate-900/40">
+                <div className="overflow-x-auto">
+                  <table className="min-w-full">
+                    <thead className="bg-slate-50 dark:bg-slate-800/50 text-left text-xs font-bold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">
+                      <tr>
+                        <th className="px-6 py-4">Name</th>
+                        <th className="px-6 py-4">Sort Order</th>
+                        <th className="px-6 py-4">Status</th>
+                        <th className="px-6 py-4 w-40">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-sm">
+                      {vendorCategoriesLoading ? (
+                        <tr>
+                          <td colSpan={4} className="px-6 py-8 text-slate-500 dark:text-slate-400">Loading…</td>
+                        </tr>
+                      ) : filteredVendorCategories.length === 0 ? (
+                        <tr>
+                          <td colSpan={4} className="px-6 py-8 text-slate-500 dark:text-slate-400">No vendor categories found.</td>
+                        </tr>
+                      ) : (
+                        filteredVendorCategories.map((c) => (
+                          <tr key={c.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40">
+                            <td className="px-6 py-3 font-medium text-slate-900 dark:text-white">{c.name}</td>
+                            <td className="px-6 py-3 text-slate-500 dark:text-slate-400">{c.sort_order}</td>
+                            <td className="px-6 py-3">
+                              <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${c.is_active ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400' : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'}`}>
+                                {c.is_active ? 'Active' : 'Inactive'}
+                              </span>
+                            </td>
+                            <td className="px-6 py-3">
+                              <div className="flex gap-1 text-slate-500 dark:text-slate-400">
+                                <button type="button" className="rounded-lg p-2 hover:bg-slate-100 dark:hover:bg-slate-800" title="Edit" onClick={() => openVendorCategoryEdit(c)}>
+                                  <Pencil size={16} />
+                                </button>
+                                <button type="button" className="rounded-lg p-2 hover:bg-rose-50 dark:hover:bg-rose-900/20 text-rose-600" title="Archive" onClick={() => setVendorCategoryDelete(c)}>
+                                  <Trash2 size={16} />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
           ) : (
             <InvoiceSettingsPanel />
           )}
@@ -1613,6 +1981,176 @@ export default function AdminConfiguration() {
               </button>
               <button type="button" className="rounded-xl bg-rose-600 px-4 py-2 text-sm font-semibold text-white" onClick={confirmDeleteBodyType}>
                 Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {reasonCategoryModal ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl dark:border-slate-800/60 dark:bg-slate-950">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-bold text-slate-900 dark:text-white">{reasonCategoryModal === 'create' ? 'New reason category' : 'Edit reason category'}</h3>
+              <button type="button" className="rounded-lg p-2 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800" onClick={closeReasonCategoryModal}>
+                <X size={18} />
+              </button>
+            </div>
+            <form onSubmit={saveReasonCategory} className="mt-4 space-y-4">
+              {reasonCategoryModalError ? (
+                <div className="rounded-xl border border-rose-300 dark:border-rose-800 bg-rose-50 dark:bg-rose-900/20 px-3 py-2 text-sm text-rose-700 dark:text-rose-400">{reasonCategoryModalError}</div>
+              ) : null}
+              <div>
+                <label className="mb-1 block text-xs font-semibold text-slate-500 dark:text-slate-400">Name</label>
+                <input
+                  value={reasonCategoryForm.name}
+                  onChange={(e) => {
+                    setReasonCategoryModalError('')
+                    setReasonCategoryForm((p) => ({ ...p, name: e.target.value }))
+                  }}
+                  className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 px-3 py-2.5 text-sm outline-none focus:border-slate-400 dark:focus:border-slate-600 placeholder:text-slate-400 dark:placeholder:text-slate-600"
+                  placeholder="e.g. Pricing Error"
+                />
+              </div>
+
+              <div>
+                <label className="mb-1 block text-xs font-semibold text-slate-500 dark:text-slate-400">Sort Order</label>
+                <input
+                  type="number"
+                  value={reasonCategoryForm.sort_order}
+                  onChange={(e) => setReasonCategoryForm((p) => ({ ...p, sort_order: e.target.value }))}
+                  className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 px-3 py-2.5 text-sm outline-none focus:border-slate-400 dark:focus:border-slate-600"
+                />
+                <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">Lower numbers appear first when issuing a credit note.</p>
+              </div>
+
+              <label className="flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-200">
+                <input
+                  type="checkbox"
+                  checked={reasonCategoryForm.is_active}
+                  onChange={(e) => setReasonCategoryForm((p) => ({ ...p, is_active: e.target.checked }))}
+                  className="h-4 w-4 rounded border-slate-300 dark:border-slate-700"
+                  style={{ accentColor: theme.accent }}
+                />
+                Active
+              </label>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <button type="button" className="rounded-xl px-4 py-2 text-sm font-semibold text-slate-600 dark:text-slate-400" onClick={closeReasonCategoryModal}>
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={reasonCategorySaving}
+                  className="rounded-xl px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+                  style={{ backgroundColor: theme.accent }}
+                >
+                  {reasonCategorySaving ? 'Saving…' : reasonCategoryModal === 'create' ? 'Save' : 'Update'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      ) : null}
+
+      {reasonCategoryDelete ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 p-6 shadow-2xl">
+            <h3 className="text-lg font-bold text-slate-900 dark:text-white">Archive reason category</h3>
+            <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
+              Archive <span className="font-semibold">{reasonCategoryDelete.name}</span>? It's hidden from new credit notes — past credit notes keep their category label either way, and you can reactivate it anytime.
+            </p>
+            <div className="mt-5 flex justify-end gap-2">
+              <button type="button" className="rounded-xl px-4 py-2 text-sm font-semibold text-slate-600 dark:text-slate-400" onClick={() => setReasonCategoryDelete(null)}>
+                Cancel
+              </button>
+              <button type="button" className="rounded-xl bg-rose-600 px-4 py-2 text-sm font-semibold text-white" onClick={confirmDeleteReasonCategory}>
+                Archive
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {vendorCategoryModal ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl dark:border-slate-800/60 dark:bg-slate-950">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-bold text-slate-900 dark:text-white">{vendorCategoryModal === 'create' ? 'New vendor category' : 'Edit vendor category'}</h3>
+              <button type="button" className="rounded-lg p-2 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800" onClick={closeVendorCategoryModal}>
+                <X size={18} />
+              </button>
+            </div>
+            <form onSubmit={saveVendorCategory} className="mt-4 space-y-4">
+              {vendorCategoryModalError ? (
+                <div className="rounded-xl border border-rose-300 dark:border-rose-800 bg-rose-50 dark:bg-rose-900/20 px-3 py-2 text-sm text-rose-700 dark:text-rose-400">{vendorCategoryModalError}</div>
+              ) : null}
+              <div>
+                <label className="mb-1 block text-xs font-semibold text-slate-500 dark:text-slate-400">Name</label>
+                <input
+                  value={vendorCategoryForm.name}
+                  onChange={(e) => {
+                    setVendorCategoryModalError('')
+                    setVendorCategoryForm((p) => ({ ...p, name: e.target.value }))
+                  }}
+                  className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 px-3 py-2.5 text-sm outline-none focus:border-slate-400 dark:focus:border-slate-600 placeholder:text-slate-400 dark:placeholder:text-slate-600"
+                  placeholder="e.g. Parts Supplier"
+                />
+              </div>
+
+              <div>
+                <label className="mb-1 block text-xs font-semibold text-slate-500 dark:text-slate-400">Sort Order</label>
+                <input
+                  type="number"
+                  value={vendorCategoryForm.sort_order}
+                  onChange={(e) => setVendorCategoryForm((p) => ({ ...p, sort_order: e.target.value }))}
+                  className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 px-3 py-2.5 text-sm outline-none focus:border-slate-400 dark:focus:border-slate-600"
+                />
+                <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">Lower numbers appear first when adding a vendor.</p>
+              </div>
+
+              <label className="flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-200">
+                <input
+                  type="checkbox"
+                  checked={vendorCategoryForm.is_active}
+                  onChange={(e) => setVendorCategoryForm((p) => ({ ...p, is_active: e.target.checked }))}
+                  className="h-4 w-4 rounded border-slate-300 dark:border-slate-700"
+                  style={{ accentColor: theme.accent }}
+                />
+                Active
+              </label>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <button type="button" className="rounded-xl px-4 py-2 text-sm font-semibold text-slate-600 dark:text-slate-400" onClick={closeVendorCategoryModal}>
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={vendorCategorySaving}
+                  className="rounded-xl px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+                  style={{ backgroundColor: theme.accent }}
+                >
+                  {vendorCategorySaving ? 'Saving…' : vendorCategoryModal === 'create' ? 'Save' : 'Update'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      ) : null}
+
+      {vendorCategoryDelete ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 p-6 shadow-2xl">
+            <h3 className="text-lg font-bold text-slate-900 dark:text-white">Archive vendor category</h3>
+            <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
+              Archive <span className="font-semibold">{vendorCategoryDelete.name}</span>? It's hidden when adding new vendors — existing vendors keep their category label either way, and you can reactivate it anytime.
+            </p>
+            <div className="mt-5 flex justify-end gap-2">
+              <button type="button" className="rounded-xl px-4 py-2 text-sm font-semibold text-slate-600 dark:text-slate-400" onClick={() => setVendorCategoryDelete(null)}>
+                Cancel
+              </button>
+              <button type="button" className="rounded-xl bg-rose-600 px-4 py-2 text-sm font-semibold text-white" onClick={confirmDeleteVendorCategory}>
+                Archive
               </button>
             </div>
           </div>

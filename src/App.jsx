@@ -15,6 +15,15 @@ import AdminInvoiceDetail from './pages/AdminInvoiceDetail'
 import AdminQuotations from './pages/AdminQuotations'
 import AdminProformaInvoices from './pages/AdminProformaInvoices'
 import AdminProformaInvoiceDetail from './pages/AdminProformaInvoiceDetail'
+import AdminCreditNotes from './pages/AdminCreditNotes'
+import AdminCreditNoteDetail from './pages/AdminCreditNoteDetail'
+import AdminVendors from './pages/AdminVendors'
+import AdminVendorForm from './pages/AdminVendorForm'
+import AdminVendorBills from './pages/AdminVendorBills'
+import AdminVendorBillForm from './pages/AdminVendorBillForm'
+import AdminVendorBillDetail from './pages/AdminVendorBillDetail'
+import AdminVendorPayments from './pages/AdminVendorPayments'
+import AdminVendorInsights from './pages/AdminVendorInsights'
 import AdminQuotationEditor from './pages/AdminQuotationEditor'
 import AdminQuotationDetail from './pages/AdminQuotationDetail'
 import AdminInsights from './pages/AdminInsights'
@@ -86,6 +95,16 @@ export default function App() {
         <Route path="/admin/quotations/:id" element={<AdminQuotationDetail />} />
         <Route path="/admin/proforma-invoices" element={<AdminProformaInvoices />} />
         <Route path="/admin/proforma-invoices/:id" element={<AdminProformaInvoiceDetail />} />
+        <Route path="/admin/credit-notes" element={<AdminCreditNotes />} />
+        <Route path="/admin/credit-notes/:id" element={<AdminCreditNoteDetail />} />
+        <Route path="/admin/vendors" element={<AdminVendors />} />
+        <Route path="/admin/vendors/new" element={<AdminVendorForm />} />
+        <Route path="/admin/vendors/:id/edit" element={<AdminVendorForm />} />
+        <Route path="/admin/vendor-bills" element={<AdminVendorBills />} />
+        <Route path="/admin/vendor-bills/new" element={<AdminVendorBillForm />} />
+        <Route path="/admin/vendor-bills/:id" element={<AdminVendorBillDetail />} />
+        <Route path="/admin/vendor-payments" element={<AdminVendorPayments />} />
+        <Route path="/admin/vendor-insights" element={<AdminVendorInsights />} />
         <Route path="/admin/services" element={<AdminServices />} />
         <Route path="/admin/reports" element={<AdminReports />} />
         <Route path="/admin/reports/invoices" element={<AdminInvoiceReport />} />

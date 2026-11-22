@@ -1,5 +1,5 @@
 import {
-  Briefcase, Car, ChevronDown, ClipboardList, FileText, LayoutGrid, LogOut,
+  Briefcase, Building2, Car, ChevronDown, ClipboardList, FileText, LayoutGrid, LogOut,
   Menu, Monitor, Moon, PanelLeftClose, PanelLeftOpen, ReceiptText,
   Settings2, SlidersHorizontal, Sun, Users, X,
 } from 'lucide-react'
@@ -27,6 +27,7 @@ const MODULE_META = {
   'user_management':   { icon: Users,             to: '/admin/users' },
   'portfolio':         { icon: Briefcase,         to: '/admin/portfolio' },
   'customer_management': { icon: Users,           to: '/admin/customers' },
+  'vendor':            { icon: Building2,         to: '/admin/vendors' },
 }
 
 // Explicit overrides for submodule keys → real frontend routes.
@@ -57,6 +58,22 @@ const SUBMODULE_ROUTE_MAP = {
   // Proforma Invoices
   'proforma_invoices':   '/admin/proforma-invoices',
   'proforma-invoices':   '/admin/proforma-invoices',
+
+  // Credit Notes
+  'credit_note':         '/admin/credit-notes',
+  'credit-note':         '/admin/credit-notes',
+  'credit_notes':        '/admin/credit-notes',
+  'credit-notes':        '/admin/credit-notes',
+
+  // Vendor
+  'vendor_list':         '/admin/vendors',
+  'vendor-list':         '/admin/vendors',
+  'vendor_bills':        '/admin/vendor-bills',
+  'vendor-bills':        '/admin/vendor-bills',
+  'vendor_payments':     '/admin/vendor-payments',
+  'vendor-payments':     '/admin/vendor-payments',
+  'vendor_insights':     '/admin/vendor-insights',
+  'vendor-insights':     '/admin/vendor-insights',
 
   // Service Vehicles
   'service-vehicles':    '/admin/service-vehicles',
